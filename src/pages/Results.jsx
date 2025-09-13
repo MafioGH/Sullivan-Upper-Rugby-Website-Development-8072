@@ -1,18 +1,18 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { format } from 'date-fns';
+import React,{useState} from 'react';
+import {motion} from 'framer-motion';
+import {format} from 'date-fns';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 import RichTextEditor from '../components/RichTextEditor';
-import { useSupabaseData } from '../hooks/useSupabaseData';
+import {useSupabaseData} from '../hooks/useSupabaseData';
 
-const { FiTrophy, FiTarget, FiCalendar, FiMapPin, FiPlus, FiEdit2, FiTrash2, FiSave, FiX, FiFileText } = FiIcons;
+const {FiTrophy,FiTarget,FiCalendar,FiMapPin,FiPlus,FiEdit2,FiTrash2,FiSave,FiX,FiFileText,FiMinus}=FiIcons;
 
-const Results = () => {
-  const { data: results, loading, error, addItem, updateItem, deleteItem } = useSupabaseData('results');
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [editingResult, setEditingResult] = useState(null);
-  const [newResult, setNewResult] = useState({
+const Results=()=> {
+  const {data: results,loading,error,addItem,updateItem,deleteItem}=useSupabaseData('results');
+  const [showAddForm,setShowAddForm]=useState(false);
+  const [editingResult,setEditingResult]=useState(null);
+  const [newResult,setNewResult]=useState({
     opponent: '',
     date: '',
     venue: '',
@@ -23,14 +23,13 @@ const Results = () => {
     notes: ''
   });
 
-  const handleAddResult = async (e) => {
+  const handleAddResult=async (e)=> {
     e.preventDefault();
-    const resultData = {
+    const resultData={
       ...newResult,
       sullivanScore: parseInt(newResult.sullivanScore),
       opponentScore: parseInt(newResult.opponentScore)
     };
-
     try {
       await addItem(resultData);
       setNewResult({
@@ -45,12 +44,12 @@ const Results = () => {
       });
       setShowAddForm(false);
     } catch (error) {
-      console.error("Error adding result:", error);
+      console.error("Error adding result:",error);
       alert("Failed to add result. Please try again.");
     }
   };
 
-  const handleEditResult = (result) => {
+  const handleEditResult=(result)=> {
     setEditingResult(result.id);
     setNewResult({
       opponent: result.opponent,
@@ -64,16 +63,15 @@ const Results = () => {
     });
   };
 
-  const handleUpdateResult = async (e) => {
+  const handleUpdateResult=async (e)=> {
     e.preventDefault();
-    const updateData = {
+    const updateData={
       ...newResult,
       sullivanScore: parseInt(newResult.sullivanScore),
       opponentScore: parseInt(newResult.opponentScore)
     };
-
     try {
-      await updateItem(editingResult, updateData);
+      await updateItem(editingResult,updateData);
       setEditingResult(null);
       setNewResult({
         opponent: '',
@@ -86,23 +84,23 @@ const Results = () => {
         notes: ''
       });
     } catch (error) {
-      console.error("Error updating result:", error);
+      console.error("Error updating result:",error);
       alert("Failed to update result. Please try again.");
     }
   };
 
-  const handleDeleteResult = async (id, opponent) => {
+  const handleDeleteResult=async (id,opponent)=> {
     if (window.confirm(`Are you sure you want to delete the result against ${opponent}? This action cannot be undone.`)) {
       try {
         await deleteItem(id);
       } catch (error) {
-        console.error("Error deleting result:", error);
+        console.error("Error deleting result:",error);
         alert("Failed to delete result. Please try again.");
       }
     }
   };
 
-  const handleCancelEdit = () => {
+  const handleCancelEdit=()=> {
     setEditingResult(null);
     setShowAddForm(false);
     setNewResult({
@@ -117,13 +115,13 @@ const Results = () => {
     });
   };
 
-  const getResultStatus = (sullivanScore, opponentScore) => {
+  const getResultStatus=(sullivanScore,opponentScore)=> {
     if (sullivanScore > opponentScore) return 'win';
     if (sullivanScore < opponentScore) return 'loss';
     return 'draw';
   };
 
-  const getStatusColor = (status) => {
+  const getStatusColor=(status)=> {
     switch (status) {
       case 'win': return 'bg-green-100 text-green-800';
       case 'loss': return 'bg-red-100 text-red-800';
@@ -132,7 +130,7 @@ const Results = () => {
     }
   };
 
-  const getStatusText = (status) => {
+  const getStatusText=(status)=> {
     switch (status) {
       case 'win': return 'WIN';
       case 'loss': return 'LOSS';
@@ -142,14 +140,14 @@ const Results = () => {
   };
 
   // Calculate season stats
-  const wins = results.filter(r => getResultStatus(r.sullivanScore, r.opponentScore) === 'win').length;
-  const losses = results.filter(r => getResultStatus(r.sullivanScore, r.opponentScore) === 'loss').length;
-  const draws = results.filter(r => getResultStatus(r.sullivanScore, r.opponentScore) === 'draw').length;
-  const totalPointsFor = results.reduce((sum, r) => sum + r.sullivanScore, 0);
-  const totalPointsAgainst = results.reduce((sum, r) => sum + r.opponentScore, 0);
+  const wins=results.filter(r=> getResultStatus(r.sullivanScore,r.opponentScore)==='win').length;
+  const losses=results.filter(r=> getResultStatus(r.sullivanScore,r.opponentScore)==='loss').length;
+  const draws=results.filter(r=> getResultStatus(r.sullivanScore,r.opponentScore)==='draw').length;
+  const totalPointsFor=results.reduce((sum,r)=> sum + r.sullivanScore,0);
+  const totalPointsAgainst=results.reduce((sum,r)=> sum + r.opponentScore,0);
 
   // Check if user is admin
-  const isAdmin = localStorage.getItem('rugbyAdminAuth') === 'true';
+  const isAdmin=localStorage.getItem('rugbyAdminAuth')==='true';
 
   if (loading) {
     return (
@@ -175,15 +173,15 @@ const Results = () => {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex justify-between items-center mb-8">
         <motion.h1
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
+          initial={{opacity: 0,x: -20}}
+          animate={{opacity: 1,x: 0}}
           className="text-3xl font-bold text-gray-800"
         >
           Results
         </motion.h1>
         {isAdmin && (
           <button
-            onClick={() => setShowAddForm(!showAddForm)}
+            onClick={()=> setShowAddForm(!showAddForm)}
             className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
           >
             <SafeIcon icon={FiPlus} className="w-4 h-4" />
@@ -192,11 +190,11 @@ const Results = () => {
         )}
       </div>
 
-      {/* Season Stats */}
+      {/* Season Stats - Now includes Draws */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8"
+        initial={{opacity: 0,y: 20}}
+        animate={{opacity: 1,y: 0}}
+        className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-8"
       >
         <div className="bg-white rounded-lg shadow-md p-4 text-center">
           <p className="text-2xl font-bold text-gray-800">{results.length}</p>
@@ -211,6 +209,10 @@ const Results = () => {
           <p className="text-sm text-gray-600">Losses</p>
         </div>
         <div className="bg-white rounded-lg shadow-md p-4 text-center">
+          <p className="text-2xl font-bold text-yellow-600">{draws}</p>
+          <p className="text-sm text-gray-600">Draws</p>
+        </div>
+        <div className="bg-white rounded-lg shadow-md p-4 text-center">
           <p className="text-2xl font-bold text-blue-600">{totalPointsFor}</p>
           <p className="text-sm text-gray-600">Points For</p>
         </div>
@@ -223,8 +225,8 @@ const Results = () => {
       {/* Add/Edit Result Form */}
       {(showAddForm || editingResult) && isAdmin && (
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{opacity: 0,y: -20}}
+          animate={{opacity: 1,y: 0}}
           className="bg-white rounded-lg shadow-md p-6 mb-8"
         >
           <h2 className="text-xl font-bold text-gray-800 mb-4">
@@ -237,7 +239,7 @@ const Results = () => {
                 <input
                   type="text"
                   value={newResult.opponent}
-                  onChange={(e) => setNewResult({ ...newResult, opponent: e.target.value })}
+                  onChange={(e)=> setNewResult({...newResult,opponent: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />
@@ -247,7 +249,7 @@ const Results = () => {
                 <input
                   type="date"
                   value={newResult.date}
-                  onChange={(e) => setNewResult({ ...newResult, date: e.target.value })}
+                  onChange={(e)=> setNewResult({...newResult,date: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />
@@ -257,7 +259,7 @@ const Results = () => {
                 <input
                   type="number"
                   value={newResult.sullivanScore}
-                  onChange={(e) => setNewResult({ ...newResult, sullivanScore: e.target.value })}
+                  onChange={(e)=> setNewResult({...newResult,sullivanScore: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                   min="0"
@@ -268,7 +270,7 @@ const Results = () => {
                 <input
                   type="number"
                   value={newResult.opponentScore}
-                  onChange={(e) => setNewResult({ ...newResult, opponentScore: e.target.value })}
+                  onChange={(e)=> setNewResult({...newResult,opponentScore: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                   min="0"
@@ -278,7 +280,7 @@ const Results = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Home/Away</label>
                 <select
                   value={newResult.homeAway}
-                  onChange={(e) => setNewResult({ ...newResult, homeAway: e.target.value })}
+                  onChange={(e)=> setNewResult({...newResult,homeAway: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="Home">Home</option>
@@ -290,7 +292,7 @@ const Results = () => {
                 <input
                   type="text"
                   value={newResult.venue}
-                  onChange={(e) => setNewResult({ ...newResult, venue: e.target.value })}
+                  onChange={(e)=> setNewResult({...newResult,venue: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />
@@ -300,9 +302,9 @@ const Results = () => {
                 <input
                   type="text"
                   value={newResult.matchType}
-                  onChange={(e) => setNewResult({ ...newResult, matchType: e.target.value })}
+                  onChange={(e)=> setNewResult({...newResult,matchType: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g., Friendly, Medallion Shield Round 1, Pre-season, etc."
+                  placeholder="e.g.,Friendly,Medallion Shield Round 1,Pre-season,etc."
                 />
               </div>
             </div>
@@ -315,14 +317,13 @@ const Results = () => {
               </label>
               <div className="bg-gray-50 p-3 rounded-lg mb-2">
                 <p className="text-sm text-gray-600">
-                  Use the rich text editor below to create a detailed match report with proper formatting, 
-                  including <strong>bold text</strong>, <em>italics</em>, bullet points, and different font sizes.
+                  Use the rich text editor below to create a detailed match report with proper formatting,including <strong>bold text</strong>,<em>italics</em>,bullet points,and different font sizes.
                 </p>
               </div>
               <RichTextEditor
                 value={newResult.notes}
-                onChange={(content) => setNewResult({ ...newResult, notes: content })}
-                placeholder="Write your match report here. Include key moments, player performances, tactical observations, and match highlights..."
+                onChange={(content)=> setNewResult({...newResult,notes: content})}
+                placeholder="Write your match report here. Include key moments,player performances,tactical observations,and match highlights..."
               />
             </div>
 
@@ -349,14 +350,14 @@ const Results = () => {
 
       {/* Results List */}
       <div className="space-y-6">
-        {results.map((result, index) => {
-          const status = getResultStatus(result.sullivanScore, result.opponentScore);
+        {results.map((result,index)=> {
+          const status=getResultStatus(result.sullivanScore,result.opponentScore);
           return (
             <motion.div
               key={result.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
+              initial={{opacity: 0,y: 20}}
+              animate={{opacity: 1,y: 0}}
+              transition={{delay: index * 0.1}}
               className="bg-white rounded-lg shadow-md p-6"
             >
               <div className="flex flex-col md:flex-row md:items-start justify-between mb-4">
@@ -372,7 +373,7 @@ const Results = () => {
                   <div className="flex items-center space-x-4 text-sm text-gray-600 mb-3">
                     <div className="flex items-center space-x-1">
                       <SafeIcon icon={FiCalendar} className="w-4 h-4" />
-                      <span>{format(new Date(result.date), 'MMMM do, yyyy')}</span>
+                      <span>{format(new Date(result.date),'MMMM do,yyyy')}</span>
                     </div>
                     <div className="flex items-center space-x-1">
                       <SafeIcon icon={FiMapPin} className="w-4 h-4" />
@@ -397,14 +398,14 @@ const Results = () => {
                   {isAdmin && (
                     <div className="flex flex-col space-y-2">
                       <button
-                        onClick={() => handleEditResult(result)}
+                        onClick={()=> handleEditResult(result)}
                         className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 transition-colors"
                         title="Edit result"
                       >
                         <SafeIcon icon={FiEdit2} className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => handleDeleteResult(result.id, result.opponent)}
+                        onClick={()=> handleDeleteResult(result.id,result.opponent)}
                         className="bg-red-600 text-white p-2 rounded-lg hover:bg-red-700 transition-colors"
                         title="Delete result"
                       >
@@ -422,13 +423,10 @@ const Results = () => {
                     <SafeIcon icon={FiFileText} className="w-5 h-5" />
                     <span>Match Report</span>
                   </h4>
-                  <div 
+                  <div
                     className="prose max-w-none text-gray-700 leading-relaxed"
-                    dangerouslySetInnerHTML={{ __html: result.notes }}
-                    style={{
-                      lineHeight: '1.7',
-                      fontSize: '15px'
-                    }}
+                    dangerouslySetInnerHTML={{__html: result.notes}}
+                    style={{lineHeight: '1.7',fontSize: '15px'}}
                   />
                 </div>
               )}
@@ -437,7 +435,7 @@ const Results = () => {
         })}
       </div>
 
-      {results.length === 0 && (
+      {results.length===0 && (
         <div className="text-center py-12">
           <SafeIcon icon={FiTrophy} className="w-16 h-16 mx-auto text-gray-400 mb-4" />
           <p className="text-gray-500 text-lg">No results yet</p>
@@ -450,47 +448,37 @@ const Results = () => {
         .prose p {
           margin-bottom: 1em;
         }
-        
         .prose strong {
           font-weight: 600;
           color: #1f2937;
         }
-        
         .prose em {
           font-style: italic;
         }
-        
         .prose u {
           text-decoration: underline;
         }
-        
-        .prose ul, .prose ol {
+        .prose ul,.prose ol {
           margin: 1em 0;
           padding-left: 1.5em;
         }
-        
         .prose li {
           margin-bottom: 0.5em;
         }
-        
         .prose br {
           line-height: 1.8;
         }
-        
-        .prose h1, .prose h2, .prose h3 {
+        .prose h1,.prose h2,.prose h3 {
           font-weight: 600;
           margin-top: 1.5em;
           margin-bottom: 0.5em;
         }
-        
         .prose h1 {
           font-size: 1.5em;
         }
-        
         .prose h2 {
           font-size: 1.3em;
         }
-        
         .prose h3 {
           font-size: 1.1em;
         }
