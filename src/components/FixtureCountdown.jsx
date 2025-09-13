@@ -4,35 +4,28 @@ import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
+import { useSupabaseData } from '../hooks/useSupabaseData';
 
 const { FiCalendar, FiMapPin, FiClock, FiTarget } = FiIcons;
 
 const FixtureCountdown = () => {
+  const { data: fixtures, loading } = useSupabaseData('fixtures');
   const [nextFixture, setNextFixture] = useState(null);
-  const [timeLeft, setTimeLeft] = useState({
-    days: 0,
-    hours: 0,
-    minutes: 0,
-    seconds: 0
-  });
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
 
   useEffect(() => {
-    // Load fixtures from localStorage
-    const savedFixtures = localStorage.getItem('rugbyFixtures');
-    if (savedFixtures) {
-      const fixtures = JSON.parse(savedFixtures);
+    if (!loading && fixtures.length > 0) {
       const now = new Date();
-      
       // Find the next upcoming fixture
       const upcomingFixtures = fixtures
         .filter(fixture => new Date(`${fixture.date} ${fixture.time}`) > now)
         .sort((a, b) => new Date(`${a.date} ${a.time}`) - new Date(`${b.date} ${b.time}`));
-      
+
       if (upcomingFixtures.length > 0) {
         setNextFixture(upcomingFixtures[0]);
       }
     }
-  }, []);
+  }, [loading, fixtures]);
 
   useEffect(() => {
     if (!nextFixture) return;
@@ -57,6 +50,21 @@ const FixtureCountdown = () => {
     return () => clearInterval(timer);
   }, [nextFixture]);
 
+  if (loading) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-gradient-to-r from-green-600 to-gray-800 rounded-lg p-6 text-white mb-8"
+      >
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-3"></div>
+          <h3 className="text-lg font-semibold mb-2">Loading Next Fixture...</h3>
+        </div>
+      </motion.div>
+    );
+  }
+
   if (!nextFixture) {
     return (
       <motion.div
@@ -68,8 +76,8 @@ const FixtureCountdown = () => {
           <SafeIcon icon={FiCalendar} className="w-8 h-8 mx-auto mb-3" />
           <h3 className="text-lg font-semibold mb-2">Next Fixture</h3>
           <p className="text-green-100">No upcoming fixtures scheduled</p>
-          <Link 
-            to="/fixtures" 
+          <Link
+            to="/fixtures"
             className="inline-block mt-3 bg-white text-green-600 px-4 py-2 rounded-lg hover:bg-green-50 transition-colors font-medium"
           >
             View All Fixtures
@@ -105,6 +113,9 @@ const FixtureCountdown = () => {
               MATCH DAY!
             </span>
           )}
+          <span className="bg-blue-500 text-white px-2 py-1 rounded-full text-xs font-bold">
+            LIVE
+          </span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -129,9 +140,7 @@ const FixtureCountdown = () => {
             </div>
             <div className="mt-3">
               <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                nextFixture.homeAway === 'Home' 
-                  ? 'bg-green-500 text-white' 
-                  : 'bg-gray-700 text-white'
+                nextFixture.homeAway === 'Home' ? 'bg-green-500 text-white' : 'bg-gray-700 text-white'
               }`}>
                 {nextFixture.homeAway}
               </span>
@@ -167,7 +176,6 @@ const FixtureCountdown = () => {
                 <div className="text-xs text-green-100">Seconds</div>
               </div>
             </div>
-            
             {isMatchSoon && (
               <div className="mt-3 text-center">
                 <span className="text-yellow-300 font-semibold animate-pulse">
@@ -179,8 +187,8 @@ const FixtureCountdown = () => {
         </div>
 
         <div className="mt-6 flex justify-center">
-          <Link 
-            to="/fixtures" 
+          <Link
+            to="/fixtures"
             className="bg-white text-green-600 px-6 py-2 rounded-lg hover:bg-green-50 transition-colors font-medium flex items-center space-x-2"
           >
             <SafeIcon icon={FiCalendar} className="w-4 h-4" />

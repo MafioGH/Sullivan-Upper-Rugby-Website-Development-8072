@@ -1,13 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
+import RichTextEditor from '../components/RichTextEditor';
+import { useSupabaseData } from '../hooks/useSupabaseData';
 
-const { FiTrophy, FiTarget, FiCalendar, FiMapPin, FiPlus, FiEdit2, FiTrash2, FiSave, FiX } = FiIcons;
+const { FiTrophy, FiTarget, FiCalendar, FiMapPin, FiPlus, FiEdit2, FiTrash2, FiSave, FiX, FiFileText } = FiIcons;
 
 const Results = () => {
-  const [results, setResults] = useState([]);
+  const { data: results, loading, error, addItem, updateItem, deleteItem } = useSupabaseData('results');
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingResult, setEditingResult] = useState(null);
   const [newResult, setNewResult] = useState({
@@ -21,39 +23,31 @@ const Results = () => {
     notes: ''
   });
 
-  // Load results from localStorage on component mount
-  useEffect(() => {
-    const savedResults = localStorage.getItem('rugbyResults');
-    if (savedResults) {
-      setResults(JSON.parse(savedResults));
-    }
-  }, []);
-
-  // Save results to localStorage whenever results change
-  useEffect(() => {
-    localStorage.setItem('rugbyResults', JSON.stringify(results));
-  }, [results]);
-
-  const handleAddResult = (e) => {
+  const handleAddResult = async (e) => {
     e.preventDefault();
-    const result = {
-      id: Date.now(),
+    const resultData = {
       ...newResult,
       sullivanScore: parseInt(newResult.sullivanScore),
       opponentScore: parseInt(newResult.opponentScore)
     };
-    setResults([result, ...results]);
-    setNewResult({
-      opponent: '',
-      date: '',
-      venue: '',
-      homeAway: 'Home',
-      sullivanScore: '',
-      opponentScore: '',
-      matchType: '',
-      notes: ''
-    });
-    setShowAddForm(false);
+
+    try {
+      await addItem(resultData);
+      setNewResult({
+        opponent: '',
+        date: '',
+        venue: '',
+        homeAway: 'Home',
+        sullivanScore: '',
+        opponentScore: '',
+        matchType: '',
+        notes: ''
+      });
+      setShowAddForm(false);
+    } catch (error) {
+      console.error("Error adding result:", error);
+      alert("Failed to add result. Please try again.");
+    }
   };
 
   const handleEditResult = (result) => {
@@ -70,34 +64,41 @@ const Results = () => {
     });
   };
 
-  const handleUpdateResult = (e) => {
+  const handleUpdateResult = async (e) => {
     e.preventDefault();
-    setResults(results.map(r => 
-      r.id === editingResult 
-        ? { 
-            ...r, 
-            ...newResult, 
-            sullivanScore: parseInt(newResult.sullivanScore),
-            opponentScore: parseInt(newResult.opponentScore)
-          }
-        : r
-    ));
-    setEditingResult(null);
-    setNewResult({
-      opponent: '',
-      date: '',
-      venue: '',
-      homeAway: 'Home',
-      sullivanScore: '',
-      opponentScore: '',
-      matchType: '',
-      notes: ''
-    });
+    const updateData = {
+      ...newResult,
+      sullivanScore: parseInt(newResult.sullivanScore),
+      opponentScore: parseInt(newResult.opponentScore)
+    };
+
+    try {
+      await updateItem(editingResult, updateData);
+      setEditingResult(null);
+      setNewResult({
+        opponent: '',
+        date: '',
+        venue: '',
+        homeAway: 'Home',
+        sullivanScore: '',
+        opponentScore: '',
+        matchType: '',
+        notes: ''
+      });
+    } catch (error) {
+      console.error("Error updating result:", error);
+      alert("Failed to update result. Please try again.");
+    }
   };
 
-  const handleDeleteResult = (id, opponent) => {
+  const handleDeleteResult = async (id, opponent) => {
     if (window.confirm(`Are you sure you want to delete the result against ${opponent}? This action cannot be undone.`)) {
-      setResults(results.filter(r => r.id !== id));
+      try {
+        await deleteItem(id);
+      } catch (error) {
+        console.error("Error deleting result:", error);
+        alert("Failed to delete result. Please try again.");
+      }
     }
   };
 
@@ -149,6 +150,26 @@ const Results = () => {
 
   // Check if user is admin
   const isAdmin = localStorage.getItem('rugbyAdminAuth') === 'true';
+
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-700">Error loading results: {error}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -209,91 +230,103 @@ const Results = () => {
           <h2 className="text-xl font-bold text-gray-800 mb-4">
             {editingResult ? 'Edit Match Result' : 'Add Match Result'}
           </h2>
-          <form onSubmit={editingResult ? handleUpdateResult : handleAddResult} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <form onSubmit={editingResult ? handleUpdateResult : handleAddResult} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Opponent</label>
+                <input
+                  type="text"
+                  value={newResult.opponent}
+                  onChange={(e) => setNewResult({ ...newResult, opponent: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                <input
+                  type="date"
+                  value={newResult.date}
+                  onChange={(e) => setNewResult({ ...newResult, date: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Sullivan Upper Score</label>
+                <input
+                  type="number"
+                  value={newResult.sullivanScore}
+                  onChange={(e) => setNewResult({ ...newResult, sullivanScore: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                  min="0"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Opponent Score</label>
+                <input
+                  type="number"
+                  value={newResult.opponentScore}
+                  onChange={(e) => setNewResult({ ...newResult, opponentScore: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                  min="0"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Home/Away</label>
+                <select
+                  value={newResult.homeAway}
+                  onChange={(e) => setNewResult({ ...newResult, homeAway: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="Home">Home</option>
+                  <option value="Away">Away</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Venue</label>
+                <input
+                  type="text"
+                  value={newResult.venue}
+                  onChange={(e) => setNewResult({ ...newResult, venue: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Match Type</label>
+                <input
+                  type="text"
+                  value={newResult.matchType}
+                  onChange={(e) => setNewResult({ ...newResult, matchType: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., Friendly, Medallion Shield Round 1, Pre-season, etc."
+                />
+              </div>
+            </div>
+
+            {/* Rich Text Editor for Match Report */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Opponent</label>
-              <input
-                type="text"
-                value={newResult.opponent}
-                onChange={(e) => setNewResult({ ...newResult, opponent: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-              <input
-                type="date"
-                value={newResult.date}
-                onChange={(e) => setNewResult({ ...newResult, date: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Sullivan Upper Score</label>
-              <input
-                type="number"
-                value={newResult.sullivanScore}
-                onChange={(e) => setNewResult({ ...newResult, sullivanScore: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-                min="0"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Opponent Score</label>
-              <input
-                type="number"
-                value={newResult.opponentScore}
-                onChange={(e) => setNewResult({ ...newResult, opponentScore: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-                min="0"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Home/Away</label>
-              <select
-                value={newResult.homeAway}
-                onChange={(e) => setNewResult({ ...newResult, homeAway: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="Home">Home</option>
-                <option value="Away">Away</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Venue</label>
-              <input
-                type="text"
-                value={newResult.venue}
-                onChange={(e) => setNewResult({ ...newResult, venue: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Match Type</label>
-              <input
-                type="text"
-                value={newResult.matchType}
-                onChange={(e) => setNewResult({ ...newResult, matchType: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="e.g., Friendly, Medallion Shield Round 1, Pre-season, etc."
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Match Notes</label>
-              <textarea
+              <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center space-x-2">
+                <SafeIcon icon={FiFileText} className="w-4 h-4" />
+                <span>Match Report</span>
+              </label>
+              <div className="bg-gray-50 p-3 rounded-lg mb-2">
+                <p className="text-sm text-gray-600">
+                  Use the rich text editor below to create a detailed match report with proper formatting, 
+                  including <strong>bold text</strong>, <em>italics</em>, bullet points, and different font sizes.
+                </p>
+              </div>
+              <RichTextEditor
                 value={newResult.notes}
-                onChange={(e) => setNewResult({ ...newResult, notes: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                rows="3"
-                placeholder="Optional match highlights, key moments, etc."
+                onChange={(content) => setNewResult({ ...newResult, notes: content })}
+                placeholder="Write your match report here. Include key moments, player performances, tactical observations, and match highlights..."
               />
             </div>
-            <div className="md:col-span-2 flex space-x-4">
+
+            <div className="flex space-x-4">
               <button
                 type="submit"
                 className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
@@ -315,7 +348,7 @@ const Results = () => {
       )}
 
       {/* Results List */}
-      <div className="space-y-4">
+      <div className="space-y-6">
         {results.map((result, index) => {
           const status = getResultStatus(result.sullivanScore, result.opponentScore);
           return (
@@ -326,7 +359,7 @@ const Results = () => {
               transition={{ delay: index * 0.1 }}
               className="bg-white rounded-lg shadow-md p-6"
             >
-              <div className="flex flex-col md:flex-row md:items-center justify-between">
+              <div className="flex flex-col md:flex-row md:items-start justify-between mb-4">
                 <div className="flex-1">
                   <div className="flex items-center space-x-3 mb-2">
                     <h3 className="text-xl font-bold text-gray-800">
@@ -347,14 +380,11 @@ const Results = () => {
                     </div>
                   </div>
                   {result.matchType && (
-                    <div className="mb-2">
+                    <div className="mb-3">
                       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                         {result.matchType}
                       </span>
                     </div>
-                  )}
-                  {result.notes && (
-                    <p className="text-gray-600 text-sm">{result.notes}</p>
                   )}
                 </div>
                 <div className="mt-4 md:mt-0 flex items-center space-x-4">
@@ -384,6 +414,24 @@ const Results = () => {
                   )}
                 </div>
               </div>
+
+              {/* Match Report with Rich Text Display */}
+              {result.notes && (
+                <div className="border-t pt-4">
+                  <h4 className="text-lg font-semibold text-gray-800 mb-3 flex items-center space-x-2">
+                    <SafeIcon icon={FiFileText} className="w-5 h-5" />
+                    <span>Match Report</span>
+                  </h4>
+                  <div 
+                    className="prose max-w-none text-gray-700 leading-relaxed"
+                    dangerouslySetInnerHTML={{ __html: result.notes }}
+                    style={{
+                      lineHeight: '1.7',
+                      fontSize: '15px'
+                    }}
+                  />
+                </div>
+              )}
             </motion.div>
           );
         })}
@@ -396,6 +444,57 @@ const Results = () => {
           <p className="text-gray-400">Results will appear here after matches are played</p>
         </div>
       )}
+
+      {/* Additional CSS for rich text display */}
+      <style jsx global>{`
+        .prose p {
+          margin-bottom: 1em;
+        }
+        
+        .prose strong {
+          font-weight: 600;
+          color: #1f2937;
+        }
+        
+        .prose em {
+          font-style: italic;
+        }
+        
+        .prose u {
+          text-decoration: underline;
+        }
+        
+        .prose ul, .prose ol {
+          margin: 1em 0;
+          padding-left: 1.5em;
+        }
+        
+        .prose li {
+          margin-bottom: 0.5em;
+        }
+        
+        .prose br {
+          line-height: 1.8;
+        }
+        
+        .prose h1, .prose h2, .prose h3 {
+          font-weight: 600;
+          margin-top: 1.5em;
+          margin-bottom: 0.5em;
+        }
+        
+        .prose h1 {
+          font-size: 1.5em;
+        }
+        
+        .prose h2 {
+          font-size: 1.3em;
+        }
+        
+        .prose h3 {
+          font-size: 1.1em;
+        }
+      `}</style>
     </div>
   );
 };

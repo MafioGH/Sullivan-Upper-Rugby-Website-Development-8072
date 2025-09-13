@@ -9,6 +9,7 @@ import Results from './pages/Results';
 import Gallery from './pages/Gallery';
 import Team from './pages/Team';
 import Admin from './pages/Admin';
+import ProtectedRoute from './components/ProtectedRoute';
 import './App.css';
 
 function App() {
@@ -16,7 +17,7 @@ function App() {
     <Router>
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-gray-50 flex flex-col">
         <Header />
-        <motion.main 
+        <motion.main
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}

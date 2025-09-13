@@ -1,22 +1,22 @@
-import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import React, {useState} from 'react';
+import {Link, useLocation} from 'react-router-dom';
+import {motion} from 'framer-motion';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 
-const { FiMenu, FiX, FiHome, FiCalendar, FiTrophy, FiCamera, FiUsers, FiSettings, FiShield, FiAward, FiBarChart } = FiIcons;
+const {FiMenu, FiX, FiHome, FiCalendar, FiTrophy, FiCamera, FiUsers, FiSettings, FiShield, FiAward, FiBarChart, FiInfo} = FiIcons;
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
 
   const navItems = [
-    { path: '/', label: 'Home', icon: FiHome },
-    { path: '/fixtures', label: 'Fixtures', icon: FiCalendar },
-    { path: '/results', label: 'Results', icon: FiBarChart },
-    { path: '/gallery', label: 'Gallery', icon: FiCamera },
-    { path: '/team', label: 'Team', icon: FiUsers },
-    { path: '/admin', label: 'Admin', icon: FiSettings },
+    {path: '/', label: 'Home', icon: FiHome},
+    {path: '/fixtures', label: 'Fixtures', icon: FiCalendar},
+    {path: '/results', label: 'Results', icon: FiBarChart},
+    {path: '/gallery', label: 'Gallery', icon: FiCamera},
+    {path: '/team', label: 'Team', icon: FiUsers},
+    {path: '/admin', label: 'Admin', icon: FiSettings},
   ];
 
   const isActive = (path) => location.pathname === path;
@@ -36,6 +36,10 @@ const Header = () => {
                 <h1 className="text-xl font-bold text-gray-800">Sullivan Upper Rugby</h1>
                 <div className="flex items-center space-x-2">
                   <p className="text-xs text-gray-600">Medallions 25/26</p>
+                  <div className="flex items-center text-xs text-gray-500 border-l border-gray-300 pl-2">
+                    <SafeIcon icon={FiInfo} className="w-3 h-3 mr-1" />
+                    <span>(unofficial site)</span>
+                  </div>
                 </div>
               </div>
             </Link>
@@ -57,9 +61,9 @@ const Header = () => {
                     : ''
                 }`}
               >
-                <SafeIcon 
-                  icon={item.path === '/admin' && isAdminAuthenticated ? FiShield : item.icon} 
-                  className="w-4 h-4" 
+                <SafeIcon
+                  icon={item.path === '/admin' && isAdminAuthenticated ? FiShield : item.icon}
+                  className="w-4 h-4"
                 />
                 <span>{item.label}</span>
                 {item.path === '/admin' && isAdminAuthenticated && (
@@ -83,11 +87,15 @@ const Header = () => {
         {/* Mobile Navigation */}
         {isMenuOpen && (
           <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
+            initial={{opacity: 0, y: -20}}
+            animate={{opacity: 1, y: 0}}
+            exit={{opacity: 0, y: -20}}
             className="md:hidden py-4 border-t border-gray-200"
           >
+            <div className="flex items-center px-4 py-2 mb-2 text-xs text-gray-500 border-b border-gray-200">
+              <SafeIcon icon={FiInfo} className="w-3 h-3 mr-1" />
+              <span>This is an unofficial fan-created site</span>
+            </div>
             {navItems.map((item) => (
               <Link
                 key={item.path}
@@ -97,15 +105,13 @@ const Header = () => {
                     ? 'bg-green-50 text-green-700 border-r-4 border-green-600'
                     : 'text-gray-700 hover:bg-gray-50'
                 } ${
-                  item.path === '/admin' && isAdminAuthenticated
-                    ? 'bg-green-50 text-green-700'
-                    : ''
+                  item.path === '/admin' && isAdminAuthenticated ? 'bg-green-50 text-green-700' : ''
                 }`}
                 onClick={() => setIsMenuOpen(false)}
               >
-                <SafeIcon 
-                  icon={item.path === '/admin' && isAdminAuthenticated ? FiShield : item.icon} 
-                  className="w-5 h-5" 
+                <SafeIcon
+                  icon={item.path === '/admin' && isAdminAuthenticated ? FiShield : item.icon}
+                  className="w-5 h-5"
                 />
                 <span>{item.label}</span>
                 {item.path === '/admin' && isAdminAuthenticated && (

@@ -4,7 +4,7 @@ import * as FiIcons from 'react-icons/fi'
 import SafeIcon from '../common/SafeIcon'
 import { migrateLocalStorageToSupabase } from '../utils/migrateData'
 
-const { FiDatabase, FiArrowRight, FiCheck, FiX } = FiIcons
+const { FiDatabase, FiArrowRight, FiCheck, FiX, FiRefreshCw } = FiIcons
 
 const MigrationButton = () => {
   const [migrating, setMigrating] = useState(false)
@@ -16,18 +16,33 @@ const MigrationButton = () => {
     setError(null)
     
     try {
+      console.log("Starting migration process...")
       const success = await migrateLocalStorageToSupabase()
+      console.log("Migration completed:", success)
+      
       if (success) {
         setMigrated(true)
         // Mark migration as complete
         localStorage.setItem('rugbyDataMigrated', 'true')
+        // Force a page refresh to ensure components switch to Supabase mode
+        setTimeout(() => {
+          window.location.reload()
+        }, 2000)
       } else {
         setError('Migration failed. Please try again.')
       }
     } catch (err) {
+      console.error("Migration error:", err)
       setError('Migration failed: ' + err.message)
     } finally {
       setMigrating(false)
+    }
+  }
+
+  const handleForceMigration = () => {
+    if (window.confirm('This will force enable cloud storage mode. Only do this if your data is already in Supabase. Continue?')) {
+      localStorage.setItem('rugbyDataMigrated', 'true')
+      window.location.reload()
     }
   }
 
@@ -41,7 +56,7 @@ const MigrationButton = () => {
         <div className="flex items-center space-x-2">
           <SafeIcon icon={FiCheck} className="w-5 h-5 text-green-600" />
           <p className="text-green-700">
-            <strong>Migration Complete!</strong> Your data is now stored in Supabase and will be accessible from any browser.
+            <strong>Migration Complete!</strong> Your data is now stored in Supabase and will be accessible from any browser. Page will refresh automatically.
           </p>
         </div>
       </motion.div>
@@ -61,7 +76,7 @@ const MigrationButton = () => {
       <p className="text-blue-700 mb-4">
         Your data is currently stored locally in this browser. Migrate it to Supabase to access it from any device or browser.
       </p>
-      
+
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
           <div className="flex items-center space-x-2">
@@ -70,24 +85,34 @@ const MigrationButton = () => {
           </div>
         </div>
       )}
-      
-      <button
-        onClick={handleMigration}
-        disabled={migrating}
-        className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 disabled:opacity-50"
-      >
-        {migrating ? (
-          <>
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-            <span>Migrating...</span>
-          </>
-        ) : (
-          <>
-            <SafeIcon icon={FiArrowRight} className="w-4 h-4" />
-            <span>Migrate Data to Cloud</span>
-          </>
-        )}
-      </button>
+
+      <div className="flex space-x-4">
+        <button
+          onClick={handleMigration}
+          disabled={migrating}
+          className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 disabled:opacity-50"
+        >
+          {migrating ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              <span>Migrating...</span>
+            </>
+          ) : (
+            <>
+              <SafeIcon icon={FiArrowRight} className="w-4 h-4" />
+              <span>Migrate Data to Cloud</span>
+            </>
+          )}
+        </button>
+        
+        <button
+          onClick={handleForceMigration}
+          className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center space-x-2"
+        >
+          <SafeIcon icon={FiRefreshCw} className="w-4 h-4" />
+          <span>Force Cloud Mode</span>
+        </button>
+      </div>
     </motion.div>
   )
 }
