@@ -1,0 +1,203 @@
+/* Base newspaper content styling */
+.newspaper-content {
+  font-size: 15px;
+  line-height: 1.7;
+  max-width: none;
+}
+
+/* Paragraph spacing */
+.newspaper-content p {
+  margin-bottom: 1em;
+  line-height: 1.6;
+}
+
+/* Text formatting */
+.newspaper-content strong {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.newspaper-content em {
+  font-style: italic;
+}
+
+.newspaper-content u {
+  text-decoration: underline;
+}
+
+/* Lists */
+.newspaper-content ul, 
+.newspaper-content ol {
+  margin: 1em 0;
+  padding-left: 1.5em;
+}
+
+.newspaper-content li {
+  margin-bottom: 0.5em;
+}
+
+/* ULTRA HIGH SPECIFICITY: Newspaper-style headlines with SUPER TIGHT spacing */
+div.newspaper-content h1,
+div.newspaper-content h2,
+div.newspaper-content h3,
+div.newspaper-content h4,
+div.newspaper-content h5,
+div.newspaper-content h6,
+.newspaper-content h1,
+.newspaper-content h2,
+.newspaper-content h3,
+.newspaper-content h4,
+.newspaper-content h5,
+.newspaper-content h6 {
+  font-weight: 600 !important;
+  margin-top: 1.5em !important;
+  margin-bottom: 0.2em !important;
+  color: #1f2937 !important;
+  font-family: inherit !important;
+}
+
+/* SUPER TIGHT line heights for headlines - MAXIMUM SPECIFICITY */
+div.newspaper-content h1,
+.newspaper-content h1 {
+  font-size: 1.5em !important;
+  line-height: 0.8 !important; /* EXTRA SUPER TIGHT */
+}
+
+div.newspaper-content h2,
+.newspaper-content h2 {
+  font-size: 1.3em !important;
+  line-height: 0.85 !important; /* SUPER TIGHT */
+}
+
+div.newspaper-content h3,
+.newspaper-content h3 {
+  font-size: 1.1em !important;
+  line-height: 0.9 !important; /* VERY TIGHT */
+}
+
+div.newspaper-content h4,
+.newspaper-content h4 {
+  font-size: 1.05em !important;
+  line-height: 0.95 !important;
+}
+
+div.newspaper-content h5,
+.newspaper-content h5 {
+  font-size: 1.0em !important;
+  line-height: 1.0 !important;
+}
+
+div.newspaper-content h6,
+.newspaper-content h6 {
+  font-size: 0.95em !important;
+  line-height: 1.0 !important;
+}
+
+/* Force tight spacing on ALL nested elements with maximum specificity */
+div.newspaper-content h1 *,
+div.newspaper-content h2 *,
+div.newspaper-content h3 *,
+div.newspaper-content h4 *,
+div.newspaper-content h5 *,
+div.newspaper-content h6 *,
+.newspaper-content h1 *,
+.newspaper-content h2 *,
+.newspaper-content h3 *,
+.newspaper-content h4 *,
+.newspaper-content h5 *,
+.newspaper-content h6 * {
+  line-height: inherit !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  font-size: inherit !important;
+}
+
+/* Ensure inline elements maintain tight spacing */
+div.newspaper-content h1 span,
+div.newspaper-content h2 span,
+div.newspaper-content h3 span,
+.newspaper-content h1 span,
+.newspaper-content h2 span,
+.newspaper-content h3 span {
+  line-height: inherit !important;
+  display: inline !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Links */
+.newspaper-content a {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+.newspaper-content a:hover {
+  text-decoration: none;
+}
+
+/* Horizontal rules */
+.newspaper-content hr {
+  margin: 20px 0;
+  border: none;
+  border-top: 2px solid #e5e7eb;
+  border-radius: 2px;
+}
+
+/* Images and videos */
+.newspaper-content .image-container,
+.newspaper-content .video-container {
+  margin: 20px 0;
+  text-align: center;
+}
+
+.newspaper-content .image-container img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.newspaper-content .image-caption {
+  font-size: 14px;
+  color: #666;
+  font-style: italic;
+  margin-top: 8px;
+  text-align: center;
+}
+
+/* Video containers */
+.newspaper-content .video-container {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  transition: all 0.3s ease;
+}
+
+.newspaper-content .video-container:hover {
+  box-shadow: 0 4px 20px rgba(59,130,246,0.2);
+}
+
+/* Video resize buttons */
+.newspaper-content .video-container:hover .video-resize-btn {
+  opacity: 1 !important;
+}
+
+/* Additional overrides to combat any conflicting styles */
+[class*="newspaper-content"] h1,
+[class*="newspaper-content"] h2,
+[class*="newspaper-content"] h3 {
+  line-height: 0.85 !important;
+  margin-bottom: 0.2em !important;
+}
+
+/* Prose override for any conflicting prose styles */
+.prose .newspaper-content h1,
+.prose .newspaper-content h2,
+.prose .newspaper-content h3,
+.prose.newspaper-content h1,
+.prose.newspaper-content h2,
+.prose.newspaper-content h3 {
+  line-height: 0.85 !important;
+  margin-bottom: 0.2em !important;
+}

@@ -1,6 +1,6 @@
 import React from 'react';
-import { HashRouter as Router, Routes, Route } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import {HashRouter as Router,Routes,Route} from 'react-router-dom';
+import {motion} from 'framer-motion';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import Home from './pages/Home';
@@ -9,8 +9,12 @@ import Results from './pages/Results';
 import Gallery from './pages/Gallery';
 import Team from './pages/Team';
 import Admin from './pages/Admin';
+import PhotoManager from './pages/PhotoManager';
+import PhotoManagerDebug from './pages/PhotoManagerDebug';
+import EmergencyDebug from './pages/EmergencyDebug';
 import ProtectedRoute from './components/ProtectedRoute';
 import './App.css';
+import './styles/newspaper.css';
 
 function App() {
   return (
@@ -18,9 +22,9 @@ function App() {
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-gray-50 flex flex-col">
         <Header />
         <motion.main
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
+          initial={{opacity: 0,y: 20}}
+          animate={{opacity: 1,y: 0}}
+          transition={{duration: 0.5}}
           className="flex-grow"
         >
           <Routes>
@@ -30,6 +34,9 @@ function App() {
             <Route path="/gallery" element={<Gallery />} />
             <Route path="/team" element={<Team />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/photo-manager" element={<PhotoManager />} />
+            <Route path="/photo-manager-debug" element={<PhotoManagerDebug />} />
+            <Route path="/emergency-debug" element={<EmergencyDebug />} />
           </Routes>
         </motion.main>
         <Footer />

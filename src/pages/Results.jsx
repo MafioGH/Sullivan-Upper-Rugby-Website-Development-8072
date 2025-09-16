@@ -363,7 +363,7 @@ const Results=()=> {
               <div className="flex flex-col md:flex-row md:items-start justify-between mb-4">
                 <div className="flex-1">
                   <div className="flex items-center space-x-3 mb-2">
-                    <h3 className="text-xl font-bold text-gray-800">
+                    <h3 className="text-xl font-bold text-gray-800 leading-tight">
                       Sullivan Upper vs {result.opponent}
                     </h3>
                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(status)}`}>
@@ -423,10 +423,13 @@ const Results=()=> {
                     <SafeIcon icon={FiFileText} className="w-5 h-5" />
                     <span>Match Report</span>
                   </h4>
-                  <div
-                    className="prose max-w-none text-gray-700 leading-relaxed"
-                    dangerouslySetInnerHTML={{__html: result.notes}}
-                    style={{lineHeight: '1.7',fontSize: '15px'}}
+                  <div 
+                    className="newspaper-content text-gray-700 leading-relaxed" 
+                    dangerouslySetInnerHTML={{__html: result.notes}} 
+                    style={{
+                      fontSize: '15px',
+                      lineHeight: '1.7'
+                    }}
                   />
                 </div>
               )}
@@ -443,44 +446,29 @@ const Results=()=> {
         </div>
       )}
 
-      {/* Additional CSS for rich text display */}
-      <style jsx global>{`
-        .prose p {
-          margin-bottom: 1em;
+      {/* Additional inline styles to ensure headlines work */}
+      <style jsx>{`
+        .newspaper-content h1,
+        .newspaper-content h2,
+        .newspaper-content h3 {
+          line-height: 0.85 !important;
+          margin-bottom: 0.2em !important;
+          font-weight: 600 !important;
         }
-        .prose strong {
-          font-weight: 600;
-          color: #1f2937;
+        
+        .newspaper-content h1 {
+          font-size: 1.5em !important;
+          line-height: 0.8 !important;
         }
-        .prose em {
-          font-style: italic;
+        
+        .newspaper-content h2 {
+          font-size: 1.3em !important;
+          line-height: 0.85 !important;
         }
-        .prose u {
-          text-decoration: underline;
-        }
-        .prose ul,.prose ol {
-          margin: 1em 0;
-          padding-left: 1.5em;
-        }
-        .prose li {
-          margin-bottom: 0.5em;
-        }
-        .prose br {
-          line-height: 1.8;
-        }
-        .prose h1,.prose h2,.prose h3 {
-          font-weight: 600;
-          margin-top: 1.5em;
-          margin-bottom: 0.5em;
-        }
-        .prose h1 {
-          font-size: 1.5em;
-        }
-        .prose h2 {
-          font-size: 1.3em;
-        }
-        .prose h3 {
-          font-size: 1.1em;
+        
+        .newspaper-content h3 {
+          font-size: 1.1em !important;
+          line-height: 0.9 !important;
         }
       `}</style>
     </div>

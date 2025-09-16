@@ -3,18 +3,18 @@ import { motion } from 'framer-motion';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 
-const { FiInfo, FiRefreshCw } = FiIcons;
+const { FiInfo, FiRefreshCw, FiBookOpen, FiAward } = FiIcons;
 
 const UlsterRugbyFact = () => {
   const [currentFact, setCurrentFact] = useState('');
   const [factIndex, setFactIndex] = useState(0);
-  
+
   // Rugby facts now loaded from localStorage if available
   useEffect(() => {
     // Try to get facts from localStorage first
     const storedFacts = localStorage.getItem('ulsterRugbyFacts');
     let factsToUse = [];
-    
+
     if (storedFacts) {
       factsToUse = JSON.parse(storedFacts);
     } else {
@@ -62,6 +62,7 @@ const UlsterRugbyFact = () => {
         "Sullivan Upper won the Medallion Plate in 2016 beating Campbell College 12-10 in the final.",
         "Sullivan Upper won the Medallion Plate in 2022 beating Rainey Endowed 22-12 in the final."
       ];
+
       // Save default facts to localStorage
       localStorage.setItem('ulsterRugbyFacts', JSON.stringify(factsToUse));
     }
@@ -78,15 +79,15 @@ const UlsterRugbyFact = () => {
     // Get updated facts from localStorage
     const storedFacts = localStorage.getItem('ulsterRugbyFacts');
     if (!storedFacts) return;
-    
+
     const facts = JSON.parse(storedFacts);
     if (facts.length === 0) return;
-    
+
     let newIndex;
     do {
       newIndex = Math.floor(Math.random() * facts.length);
     } while (newIndex === factIndex && facts.length > 1);
-    
+
     setFactIndex(newIndex);
     setCurrentFact(facts[newIndex]);
   };
@@ -96,30 +97,56 @@ const UlsterRugbyFact = () => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.8 }}
-      className="bg-gradient-to-r from-green-100 to-gray-100 rounded-lg p-6 border-l-4 border-green-600"
+      className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-lg p-6 text-white mb-8 relative overflow-hidden"
     >
-      <div className="flex items-start justify-between mb-3">
-        <h3 className="text-lg font-bold text-gray-800 flex items-center space-x-2">
-          <SafeIcon icon={FiInfo} className="w-5 h-5 text-green-600" />
-          <span>Ulster Schools Rugby Fact</span>
-        </h3>
-        <button
-          onClick={getNewFact}
-          className="bg-green-600 text-white p-2 rounded-full hover:bg-green-700 transition-colors"
-          title="Get new fact"
-        >
-          <SafeIcon icon={FiRefreshCw} className="w-4 h-4" />
-        </button>
+      {/* Background Pattern */}
+      <div className="absolute inset-0 opacity-10">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-white rounded-full -translate-y-16 translate-x-16"></div>
+        <div className="absolute bottom-0 left-0 w-24 h-24 bg-white rounded-full translate-y-12 -translate-x-12"></div>
+        <div className="absolute top-1/2 left-1/4 w-16 h-16 bg-white rounded-full -translate-y-8 -translate-x-8"></div>
       </div>
-      <motion.p
-        key={factIndex}
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.5 }}
-        className="text-gray-700 leading-relaxed"
-      >
-        {currentFact}
-      </motion.p>
+
+      <div className="relative z-10">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-3">
+            <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+              <SafeIcon icon={FiBookOpen} className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold flex items-center space-x-2">
+                <SafeIcon icon={FiInfo} className="w-5 h-5" />
+                <span>Did You Know?</span>
+              </h3>
+              <p className="text-blue-100 text-sm">Ulster Schools Rugby History</p>
+            </div>
+          </div>
+          
+          <motion.button
+            onClick={getNewFact}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="bg-white bg-opacity-20 text-white p-3 rounded-full hover:bg-opacity-30 transition-colors"
+            title="Get new fact"
+          >
+            <SafeIcon icon={FiRefreshCw} className="w-5 h-5" />
+          </motion.button>
+        </div>
+
+        <motion.div
+          key={factIndex}
+          initial={{ opacity: 0, x: -30 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          className="bg-white bg-opacity-10 rounded-lg p-4"
+        >
+          <div className="flex items-start space-x-3">
+            <SafeIcon icon={FiAward} className="w-6 h-6 text-yellow-300 flex-shrink-0 mt-1" />
+            <p className="text-white leading-relaxed">
+              {currentFact}
+            </p>
+          </div>
+        </motion.div>
+      </div>
     </motion.div>
   );
 };
