@@ -5,7 +5,7 @@ import SafeIcon from '../common/SafeIcon';
 import {useSupabaseData} from '../hooks/useSupabaseData';
 import ProtectedPage from '../components/ProtectedPage';
 
-const {FiCamera,FiVideo,FiPlay,FiImage,FiInfo,FiExternalLink,FiTrash2,FiEdit3,FiSave,FiX,FiLock,FiShield,FiUpload,FiSearch,FiFilter,FiCalendar,FiTag,FiType,FiRefreshCw}=FiIcons;
+const {FiCamera,FiVideo,FiPlay,FiImage,FiInfo,FiExternalLink,FiTrash2,FiEdit3,FiSave,FiX,FiLock,FiShield,FiUpload,FiSearch,FiFilter,FiCalendar,FiTag,FiType,FiRefreshCw,FiDownload}=FiIcons;
 
 const PhotoManager=()=> {
 // 🔧 FIXED: Now using Supabase instead of localStorage
@@ -128,7 +128,54 @@ if (dateRange.start || dateRange.end) count++;
 return count;
 };
 
-// NEW: Auto-generate thumbnail from video URL
+// 🆕 ENHANCED: Google Drive thumbnail extraction with multiple methods
+const extractGoogleDriveVideoId=(url)=> {
+if (!url || !url.includes('drive.google.com')) return null;
+
+// Extract file ID from various Google Drive URL formats
+const patterns=[
+/\/file\/d\/([a-zA-Z0-9_-]+)/,
+/id=([a-zA-Z0-9_-]+)/,
+/\/d\/([a-zA-Z0-9_-]+)/,
+/file\/d\/([a-zA-Z0-9_-]+)\/view/,
+/file\/d\/([a-zA-Z0-9_-]+)\/preview/
+];
+
+for (const pattern of patterns) {
+const match=url.match(pattern);
+if (match && match[1]) {
+return match[1];
+}
+}
+
+return null;
+};
+
+// 🆕 NEW: Generate Google Drive video thumbnail with multiple fallback methods
+const generateGoogleDriveThumbnail=(url)=> {
+const fileId=extractGoogleDriveVideoId(url);
+if (!fileId) {
+console.warn('Could not extract Google Drive file ID from:',url);
+return null;
+}
+
+console.log('🎬 Generating Google Drive thumbnail for file ID:',fileId);
+
+// Method 1: Google Drive thumbnail API (primary method)
+const driveThumbUrl=`https://drive.google.com/thumbnail?id=${fileId}&sz=w480-h270`;
+
+// Method 2: Alternative thumbnail format
+const altThumbUrl=`https://lh3.googleusercontent.com/d/${fileId}=w480-h270`;
+
+// Return primary with fallback
+return {
+primary: driveThumbUrl,
+fallback: altThumbUrl,
+fileId: fileId
+};
+};
+
+// 🆕 ENHANCED: Auto-generate thumbnail with Google Drive support
 const generateThumbnail=(url,videoType)=> {
 if (!url || !autoThumbnail) return '';
 
@@ -151,6 +198,15 @@ return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
 }
 }
 
+// 🆕 ENHANCED: Google Drive thumbnail generation
+if (videoType==='googledrive' || url.includes('drive.google.com')) {
+const driveThumb=generateGoogleDriveThumbnail(url);
+if (driveThumb) {
+console.log('✅ Generated Google Drive thumbnail:',driveThumb.primary);
+return driveThumb.primary;
+}
+}
+
 // Vimeo thumbnail (requires API call,so we'll use a placeholder for now)
 if (videoType==='vimeo' || url.includes('vimeo.com')) {
 const videoId=url.match(/vimeo\.com\/(\d+)/)?.[1];
@@ -158,11 +214,6 @@ if (videoId) {
 // Vimeo thumbnails require API calls,so we'll use a generic video thumbnail
 return `https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=480&h=270&fit=crop`;
 }
-}
-
-// Google Drive - use generic video thumbnail
-if (videoType==='googledrive' || url.includes('drive.google.com')) {
-return `https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=480&h=270&fit=crop`;
 }
 
 // Bunny.net - use generic video thumbnail
@@ -322,7 +373,6 @@ console.log('🔧 FIXED: Saving media to Supabase:',formData);
 
 try {
 await addItem(formData);
-
 // Reset form
 setMediaUrl('');
 setTitle('');
@@ -331,7 +381,6 @@ setTags('');
 setVideoType('youtube');
 setThumbnail('');
 setAutoThumbnail(true);
-
 alert(`${mediaType==='image' ? 'Photo' : 'Video'} added successfully to database!`);
 } catch (error) {
 console.error('❌ Error saving to Supabase:',error);
@@ -463,15 +512,64 @@ alert('Failed to delete media from database. Please try again.');
 }
 };
 
-// Get video thumbnail for display
+// 🆕 ENHANCED: Get video thumbnail with Google Drive support and fallbacks
 const getVideoThumbnail=(mediaItem)=> {
 // Use custom thumbnail if available
 if (mediaItem.thumbnail) {
 return mediaItem.thumbnail;
 }
 
+// 🆕 ENHANCED: Google Drive thumbnail generation with fallbacks
+if (mediaItem.type==='video' && (mediaItem.videoType==='googledrive' || mediaItem.url.includes('drive.google.com'))) {
+const driveThumb=generateGoogleDriveThumbnail(mediaItem.url);
+if (driveThumb) {
+return driveThumb.primary;
+}
+}
+
 // Auto-generate thumbnail for existing videos without thumbnails
 return generateThumbnail(mediaItem.url,mediaItem.videoType || 'youtube');
+};
+
+// 🆕 NEW: Bulk update Google Drive thumbnails for existing videos
+const updateGoogleDriveVideoThumbnails=async ()=> {
+if (!isAdmin) {
+alert('Access denied. Admin authentication required.');
+return;
+}
+
+const googleDriveVideos=media.filter(item=> 
+item.type==='video' && 
+(item.videoType==='googledrive' || item.url.includes('drive.google.com')) &&
+!item.thumbnail
+);
+
+if (googleDriveVideos.length===0) {
+alert('No Google Drive videos found that need thumbnail updates.');
+return;
+}
+
+if (!window.confirm(`Update thumbnails for ${googleDriveVideos.length} Google Drive videos? This will generate new thumbnails automatically.`)) {
+return;
+}
+
+let updated=0;
+for (const video of googleDriveVideos) {
+try {
+const newThumbnail=generateThumbnail(video.url,'googledrive');
+if (newThumbnail) {
+await updateItem(video.id,{
+...video,
+thumbnail: newThumbnail
+});
+updated++;
+}
+} catch (error) {
+console.error(`Failed to update thumbnail for ${video.title}:`,error);
+}
+}
+
+alert(`Successfully updated thumbnails for ${updated} Google Drive videos!`);
 };
 
 // Render media content with IMPROVED Bunny.net handling
@@ -481,7 +579,13 @@ return (
 <img
 src={mediaItem.url}
 alt={mediaItem.title}
-style={{width: '100%',height: 'auto',maxHeight: '70vh',objectFit: 'contain',display: 'block'}}
+style={{
+width: '100%',
+height: 'auto',
+maxHeight: '70vh',
+objectFit: 'contain',
+display: 'block'
+}}
 onError={(e)=> {
 e.target.style.display='none';
 e.target.nextElementSibling.style.display='flex';
@@ -540,7 +644,12 @@ return (
 <video
 src={url}
 controls
-style={{width: '100%',height: '100%',objectFit: 'contain',backgroundColor: '#000'}}
+style={{
+width: '100%',
+height: '100%',
+objectFit: 'contain',
+backgroundColor: '#000'
+}}
 title={mediaItem.title}
 preload="metadata"
 crossOrigin="anonymous"
@@ -593,7 +702,15 @@ return (
 <video
 src={url}
 controls
-style={{width: '100%',height: 'auto',aspectRatio: '16/9',borderRadius: '8px',backgroundColor: '#000',display: 'block',objectFit: 'contain'}}
+style={{
+width: '100%',
+height: 'auto',
+aspectRatio: '16/9',
+borderRadius: '8px',
+backgroundColor: '#000',
+display: 'block',
+objectFit: 'contain'
+}}
 title={mediaItem.title}
 preload="metadata"
 crossOrigin="anonymous"
@@ -627,13 +744,20 @@ const activeFilterCount=getActiveFilterCount();
 const allTags=getAllTags();
 
 // Create the PhotoManagerContent component to be wrapped by ProtectedPage
-const PhotoManagerContent = () => {
+const PhotoManagerContent=()=> {
 // 🔧 FIXED: Show loading state from Supabase
 if (loading) {
 return (
 <div style={{maxWidth: '1200px',margin: '0 auto',padding: '20px'}}>
 <div style={{display: 'flex',justifyContent: 'center',alignItems: 'center',height: '300px'}}>
-<div style={{width: '40px',height: '40px',border: '4px solid #f3f3f3',borderTop: '4px solid #059669',borderRadius: '50%',animation: 'spin 1s linear infinite'}} />
+<div style={{
+width: '40px',
+height: '40px',
+border: '4px solid #f3f3f3',
+borderTop: '4px solid #059669',
+borderRadius: '50%',
+animation: 'spin 1s linear infinite'
+}} />
 </div>
 </div>
 );
@@ -643,7 +767,13 @@ return (
 if (error) {
 return (
 <div style={{maxWidth: '1200px',margin: '0 auto',padding: '20px'}}>
-<div style={{backgroundColor: '#fef2f2',border: '1px solid #fca5a5',borderRadius: '8px',padding: '16px',color: '#dc2626'}}>
+<div style={{
+backgroundColor: '#fef2f2',
+border: '1px solid #fca5a5',
+borderRadius: '8px',
+padding: '16px',
+color: '#dc2626'
+}}>
 <p><strong>Database Error:</strong> {error}</p>
 <p style={{fontSize: '14px',marginTop: '8px'}}>
 Unable to load media from database. Please check your connection and try again.
@@ -658,12 +788,25 @@ return (
 <motion.h1
 initial={{opacity: 0,y: -20}}
 animate={{opacity: 1,y: 0}}
-style={{fontSize: '2rem',marginBottom: '1rem',color: '#333',display: 'flex',alignItems: 'center',gap: '12px'}}
+style={{
+fontSize: '2rem',
+marginBottom: '1rem',
+color: '#333',
+display: 'flex',
+alignItems: 'center',
+gap: '12px'
+}}
 >
 <SafeIcon icon={FiCamera} style={{fontSize: '1.8rem',color: '#059669'}} />
 Media Gallery
 {!isAdmin && (
-<span style={{fontSize: '1rem',color: '#dc2626',display: 'flex',alignItems: 'center',gap: '6px'}}>
+<span style={{
+fontSize: '1rem',
+color: '#dc2626',
+display: 'flex',
+alignItems: 'center',
+gap: '6px'
+}}>
 <SafeIcon icon={FiLock} style={{fontSize: '1rem'}} />
 (View Only)
 </span>
@@ -680,7 +823,16 @@ Media Gallery
 <motion.div
 initial={{opacity: 0,y: 20}}
 animate={{opacity: 1,y: 0}}
-style={{backgroundColor: '#fef3c7',border: '1px solid #f59e0b',borderRadius: '12px',padding: '16px',marginBottom: '30px',display: 'flex',alignItems: 'center',gap: '12px'}}
+style={{
+backgroundColor: '#fef3c7',
+border: '1px solid #f59e0b',
+borderRadius: '12px',
+padding: '16px',
+marginBottom: '30px',
+display: 'flex',
+alignItems: 'center',
+gap: '12px'
+}}
 >
 <SafeIcon icon={FiShield} style={{color: '#f59e0b',fontSize: '1.2rem'}} />
 <div>
@@ -694,17 +846,73 @@ You can add,edit,and delete media items. All changes are saved to the database.
 <motion.div
 initial={{opacity: 0,y: 20}}
 animate={{opacity: 1,y: 0}}
-style={{backgroundColor: '#f0fdf4',border: '1px solid #16a34a',borderRadius: '12px',padding: '16px',marginBottom: '30px',display: 'flex',alignItems: 'center',gap: '12px'}}
+style={{
+backgroundColor: '#f0fdf4',
+border: '1px solid #16a34a',
+borderRadius: '12px',
+padding: '16px',
+marginBottom: '30px',
+display: 'flex',
+alignItems: 'center',
+gap: '12px'
+}}
 >
 <SafeIcon icon={FiShield} style={{color: '#16a34a',fontSize: '1.2rem'}} />
 <div>
 <strong style={{color: '#14532d'}}>✅ Database Connected:</strong>
 <p style={{color: '#14532d',margin: '4px 0 0 0',fontSize: '14px'}}>
 All media is now stored in Supabase database and will persist across devices and sessions. Showing {media.length} items from database.
-<strong>NEW:</strong> Video thumbnails now supported!
+<strong> Enhanced Google Drive video thumbnails now supported!</strong>
 </p>
 </div>
 </motion.div>
+
+{/* 🆕 NEW: Google Drive Thumbnail Update Tool */}
+{media.filter(item=> item.type==='video' && (item.videoType==='googledrive' || item.url.includes('drive.google.com')) && !item.thumbnail).length > 0 && (
+<motion.div
+initial={{opacity: 0,y: 20}}
+animate={{opacity: 1,y: 0}}
+style={{
+backgroundColor: '#dbeafe',
+border: '1px solid #3b82f6',
+borderRadius: '12px',
+padding: '16px',
+marginBottom: '30px'
+}}
+>
+<div style={{display: 'flex',alignItems: 'center',justifyContent: 'space-between'}}>
+<div style={{flex: 1}}>
+<strong style={{color: '#1e40af',display: 'flex',alignItems: 'center',gap: '8px'}}>
+<SafeIcon icon={FiDownload} />
+Google Drive Thumbnail Update Available
+</strong>
+<p style={{color: '#1e40af',margin: '4px 0 0 0',fontSize: '14px'}}>
+Found {media.filter(item=> item.type==='video' && (item.videoType==='googledrive' || item.url.includes('drive.google.com')) && !item.thumbnail).length} Google Drive videos without thumbnails. 
+Click to auto-generate thumbnails for better gallery display.
+</p>
+</div>
+<button
+onClick={updateGoogleDriveVideoThumbnails}
+style={{
+backgroundColor: '#3b82f6',
+color: 'white',
+border: 'none',
+borderRadius: '8px',
+padding: '8px 16px',
+cursor: 'pointer',
+fontSize: '14px',
+fontWeight: '600',
+display: 'flex',
+alignItems: 'center',
+gap: '6px'
+}}
+>
+<SafeIcon icon={FiRefreshCw} />
+Update Thumbnails
+</button>
+</div>
+</motion.div>
+)}
 </>
 )}
 
@@ -714,9 +922,21 @@ All media is now stored in Supabase database and will persist across devices and
 initial={{opacity: 0,y: 20}}
 animate={{opacity: 1,y: 0}}
 transition={{delay: 0.1}}
-style={{backgroundColor: 'white',padding: '30px',borderRadius: '12px',boxShadow: '0 4px 20px rgba(0,0,0,0.1)',marginBottom: '40px'}}
+style={{
+backgroundColor: 'white',
+padding: '30px',
+borderRadius: '12px',
+boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+marginBottom: '40px'
+}}
 >
-<h2 style={{marginBottom: '20px',color: '#555',display: 'flex',alignItems: 'center',gap: '8px'}}>
+<h2 style={{
+marginBottom: '20px',
+color: '#555',
+display: 'flex',
+alignItems: 'center',
+gap: '8px'
+}}>
 <SafeIcon icon={mediaType==='image' ? FiCamera : FiVideo} />
 {showEditForm ? `Edit ${editingMedia?.type==='image' ? 'Photo' : 'Video'}` : `Add New ${mediaType==='image' ? 'Photo' : 'Video'} (Database)`}
 </h2>
@@ -724,11 +944,25 @@ style={{backgroundColor: 'white',padding: '30px',borderRadius: '12px',boxShadow:
 <form onSubmit={showEditForm ? handleUpdateMedia : handleSubmit}>
 {/* Media Type Selection */}
 <div style={{marginBottom: '20px'}}>
-<label style={{display: 'block',marginBottom: '8px',fontWeight: 'bold',color: '#333'}}>
+<label style={{
+display: 'block',
+marginBottom: '8px',
+fontWeight: 'bold',
+color: '#333'
+}}>
 Media Type *
 </label>
 <div style={{display: 'flex',gap: '12px'}}>
-<label style={{display: 'flex',alignItems: 'center',cursor: 'pointer',padding: '8px 12px',border: '2px solid',borderColor: mediaType==='image' ? '#059669' : '#ddd',borderRadius: '8px',backgroundColor: mediaType==='image' ? '#f0fdf4' : 'white'}}>
+<label style={{
+display: 'flex',
+alignItems: 'center',
+cursor: 'pointer',
+padding: '8px 12px',
+border: '2px solid',
+borderColor: mediaType==='image' ? '#059669' : '#ddd',
+borderRadius: '8px',
+backgroundColor: mediaType==='image' ? '#f0fdf4' : 'white'
+}}>
 <input
 type="radio"
 value="image"
@@ -739,7 +973,16 @@ style={{marginRight: '8px'}}
 <SafeIcon icon={FiCamera} style={{marginRight: '6px'}} />
 Photo
 </label>
-<label style={{display: 'flex',alignItems: 'center',cursor: 'pointer',padding: '8px 12px',border: '2px solid',borderColor: mediaType==='video' ? '#059669' : '#ddd',borderRadius: '8px',backgroundColor: mediaType==='video' ? '#f0fdf4' : 'white'}}>
+<label style={{
+display: 'flex',
+alignItems: 'center',
+cursor: 'pointer',
+padding: '8px 12px',
+border: '2px solid',
+borderColor: mediaType==='video' ? '#059669' : '#ddd',
+borderRadius: '8px',
+backgroundColor: mediaType==='video' ? '#f0fdf4' : 'white'
+}}>
 <input
 type="radio"
 value="video"
@@ -756,13 +999,25 @@ Video
 {/* Video Source Selection (only for videos) */}
 {mediaType==='video' && (
 <div style={{marginBottom: '20px'}}>
-<label style={{display: 'block',marginBottom: '8px',fontWeight: 'bold',color: '#333'}}>
+<label style={{
+display: 'block',
+marginBottom: '8px',
+fontWeight: 'bold',
+color: '#333'
+}}>
 Video Source
 </label>
 <select
 value={videoType}
 onChange={(e)=> setVideoType(e.target.value)}
-style={{width: '100%',padding: '12px',border: '2px solid #ddd',borderRadius: '8px',fontSize: '16px',boxSizing: 'border-box'}}
+style={{
+width: '100%',
+padding: '12px',
+border: '2px solid #ddd',
+borderRadius: '8px',
+fontSize: '16px',
+boxSizing: 'border-box'
+}}
 >
 <option value="youtube">YouTube</option>
 <option value="vimeo">Vimeo</option>
@@ -777,7 +1032,12 @@ style={{width: '100%',padding: '12px',border: '2px solid #ddd',borderRadius: '8p
 
 {/* Media URL Field */}
 <div style={{marginBottom: '20px'}}>
-<label htmlFor="mediaUrl" style={{display: 'block',marginBottom: '8px',fontWeight: 'bold',color: '#333'}}>
+<label htmlFor="mediaUrl" style={{
+display: 'block',
+marginBottom: '8px',
+fontWeight: 'bold',
+color: '#333'
+}}>
 {mediaType==='image' ? 'Image URL' : 'Video URL'} *
 </label>
 <input
@@ -785,17 +1045,33 @@ type="url"
 id="mediaUrl"
 value={mediaUrl}
 onChange={(e)=> setMediaUrl(e.target.value)}
-placeholder={mediaType==='image' ? 'https://example.com/image.jpg' : 
+placeholder={
+mediaType==='image' ? 'https://example.com/image.jpg' :
 videoType==='youtube' ? 'https://www.youtube.com/watch?v=VIDEO_ID' :
 videoType==='bunny' ? 'https://your-zone.b-cdn.net/video.mp4 OR https://iframe.mediadelivery.net/embed/LIBRARY_ID/VIDEO_ID' :
-'https://example.com/video.mp4'}
+videoType==='googledrive' ? 'https://drive.google.com/file/d/FILE_ID/view' :
+'https://example.com/video.mp4'
+}
 required
-style={{width: '100%',padding: '12px',border: '2px solid #ddd',borderRadius: '8px',fontSize: '16px',boxSizing: 'border-box'}}
+style={{
+width: '100%',
+padding: '12px',
+border: '2px solid #ddd',
+borderRadius: '8px',
+fontSize: '16px',
+boxSizing: 'border-box'
+}}
 />
 
 {/* Enhanced Video URL Help */}
 {mediaType==='video' && (
-<div style={{marginTop: '8px',padding: '12px',backgroundColor: '#f0f9ff',borderRadius: '8px',border: '1px solid #0ea5e9'}}>
+<div style={{
+marginTop: '8px',
+padding: '12px',
+backgroundColor: '#f0f9ff',
+borderRadius: '8px',
+border: '1px solid #0ea5e9'
+}}>
 <div style={{display: 'flex',alignItems: 'flex-start',gap: '8px'}}>
 <SafeIcon icon={FiInfo} style={{color: '#0ea5e9',marginTop: '2px'}} />
 <div style={{fontSize: '14px',color: '#0c4a6e'}}>
@@ -817,9 +1093,6 @@ style={{width: '100%',padding: '12px',border: '2px solid #ddd',borderRadius: '8p
 <strong>🔄 Iframe URL (Alternative):</strong><br/>
 • https://iframe.mediadelivery.net/embed/LIBRARY_ID/VIDEO_ID
 </p>
-<p style={{fontSize: '12px',marginTop: '4px',color: '#16a34a'}}>
-<strong>🔧 Fixed:</strong> Both formats now display properly with consistent sizing!
-</p>
 </div>
 )}
 {videoType==='vimeo' && (
@@ -829,9 +1102,10 @@ style={{width: '100%',padding: '12px',border: '2px solid #ddd',borderRadius: '8p
 <div>
 <p><strong>Google Drive:</strong> Share video publicly</p>
 <p style={{fontSize: '12px',marginTop: '4px'}}>
-1. Upload to Google Drive<br/>
+1. Upload video to Google Drive<br/>
 2. Share → Anyone with link can view<br/>
-3. Copy and paste the link
+3. Copy and paste the link<br/>
+<strong>🖼️ Automatic thumbnail generation supported!</strong>
 </p>
 </div>
 )}
@@ -854,7 +1128,12 @@ Upload video and share the Dropbox link
 
 {/* Title Field */}
 <div style={{marginBottom: '20px'}}>
-<label htmlFor="title" style={{display: 'block',marginBottom: '8px',fontWeight: 'bold',color: '#333'}}>
+<label htmlFor="title" style={{
+display: 'block',
+marginBottom: '8px',
+fontWeight: 'bold',
+color: '#333'
+}}>
 Title *
 </label>
 <input
@@ -864,13 +1143,25 @@ value={title}
 onChange={(e)=> setTitle(e.target.value)}
 placeholder={`Enter a descriptive title for your ${mediaType}`}
 required
-style={{width: '100%',padding: '12px',border: '2px solid #ddd',borderRadius: '8px',fontSize: '16px',boxSizing: 'border-box'}}
+style={{
+width: '100%',
+padding: '12px',
+border: '2px solid #ddd',
+borderRadius: '8px',
+fontSize: '16px',
+boxSizing: 'border-box'
+}}
 />
 </div>
 
 {/* Description Field */}
 <div style={{marginBottom: '20px'}}>
-<label htmlFor="description" style={{display: 'block',marginBottom: '8px',fontWeight: 'bold',color: '#333'}}>
+<label htmlFor="description" style={{
+display: 'block',
+marginBottom: '8px',
+fontWeight: 'bold',
+color: '#333'
+}}>
 Description
 </label>
 <textarea
@@ -879,20 +1170,38 @@ value={description}
 onChange={(e)=> setDescription(e.target.value)}
 placeholder={`Optional description of the ${mediaType}...`}
 rows="4"
-style={{width: '100%',padding: '12px',border: '2px solid #ddd',borderRadius: '8px',fontSize: '16px',boxSizing: 'border-box',resize: 'vertical',fontFamily: 'inherit'}}
+style={{
+width: '100%',
+padding: '12px',
+border: '2px solid #ddd',
+borderRadius: '8px',
+fontSize: '16px',
+boxSizing: 'border-box',
+resize: 'vertical',
+fontFamily: 'inherit'
+}}
 />
 </div>
 
-{/* NEW: Thumbnail Section for Videos */}
+{/* 🆕 ENHANCED: Thumbnail Section for Videos with Google Drive support */}
 {mediaType==='video' && (
 <div style={{marginBottom: '20px'}}>
-<label style={{display: 'block',marginBottom: '8px',fontWeight: 'bold',color: '#333'}}>
+<label style={{
+display: 'block',
+marginBottom: '8px',
+fontWeight: 'bold',
+color: '#333'
+}}>
 Video Thumbnail
 </label>
 
 {/* Auto-generate toggle */}
 <div style={{marginBottom: '12px'}}>
-<label style={{display: 'flex',alignItems: 'center',cursor: 'pointer'}}>
+<label style={{
+display: 'flex',
+alignItems: 'center',
+cursor: 'pointer'
+}}>
 <input
 type="checkbox"
 checked={autoThumbnail}
@@ -901,6 +1210,9 @@ style={{marginRight: '8px'}}
 />
 <span style={{fontSize: '14px',color: '#374151'}}>
 Auto-generate thumbnail from video URL
+{videoType==='googledrive' && (
+<span style={{color: '#16a34a',fontWeight: '600'}}> (Enhanced for Google Drive!)</span>
+)}
 </span>
 </label>
 </div>
@@ -913,7 +1225,14 @@ type="url"
 value={thumbnail}
 onChange={(e)=> setThumbnail(e.target.value)}
 placeholder="https://example.com/thumbnail.jpg"
-style={{width: '100%',padding: '12px',border: '2px solid #ddd',borderRadius: '8px',fontSize: '16px',boxSizing: 'border-box'}}
+style={{
+width: '100%',
+padding: '12px',
+border: '2px solid #ddd',
+borderRadius: '8px',
+fontSize: '16px',
+boxSizing: 'border-box'
+}}
 />
 <p style={{fontSize: '12px',color: '#6b7280',marginTop: '4px'}}>
 Enter a custom thumbnail URL,or leave empty to use auto-generated thumbnail
@@ -924,31 +1243,60 @@ Enter a custom thumbnail URL,or leave empty to use auto-generated thumbnail
 {/* Thumbnail preview */}
 {(thumbnail || (autoThumbnail && mediaUrl)) && (
 <div style={{marginTop: '12px'}}>
-<p style={{fontSize: '14px',fontWeight: '600',color: '#374151',marginBottom: '8px'}}>
+<p style={{
+fontSize: '14px',
+fontWeight: '600',
+color: '#374151',
+marginBottom: '8px'
+}}>
 Thumbnail Preview:
 </p>
 <img
 src={thumbnail || (autoThumbnail ? generateThumbnail(mediaUrl,videoType) : '')}
 alt="Video thumbnail preview"
-style={{width: '200px',height: '112px',objectFit: 'cover',borderRadius: '8px',border: '2px solid #e5e7eb'}}
+style={{
+width: '200px',
+height: '112px',
+objectFit: 'cover',
+borderRadius: '8px',
+border: '2px solid #e5e7eb'
+}}
 onError={(e)=> {
 e.target.style.display='none';
 e.target.nextElementSibling.style.display='block';
 }}
 />
-<div style={{display: 'none',width: '200px',height: '112px',backgroundColor: '#f3f4f6',borderRadius: '8px',border: '2px solid #e5e7eb',alignItems: 'center',justifyContent: 'center',color: '#6b7280',fontSize: '12px'}}>
+<div style={{
+display: 'none',
+width: '200px',
+height: '112px',
+backgroundColor: '#f3f4f6',
+borderRadius: '8px',
+border: '2px solid #e5e7eb',
+alignItems: 'center',
+justifyContent: 'center',
+color: '#6b7280',
+fontSize: '12px'
+}}>
 Thumbnail not available
 </div>
 </div>
 )}
 
-<div style={{marginTop: '8px',padding: '12px',backgroundColor: '#f0f9ff',borderRadius: '8px',border: '1px solid #0ea5e9'}}>
+<div style={{
+marginTop: '8px',
+padding: '12px',
+backgroundColor: '#f0f9ff',
+borderRadius: '8px',
+border: '1px solid #0ea5e9'
+}}>
 <div style={{display: 'flex',alignItems: 'flex-start',gap: '8px'}}>
 <SafeIcon icon={FiImage} style={{color: '#0ea5e9',marginTop: '2px'}} />
 <div style={{fontSize: '14px',color: '#0c4a6e'}}>
-<p><strong>🖼️ NEW: Thumbnail Support!</strong></p>
+<p><strong>🖼️ Thumbnail Support!</strong></p>
 <ul style={{fontSize: '12px',marginTop: '4px',paddingLeft: '16px'}}>
-<li><strong>Auto-generate:</strong> YouTube videos get high-quality thumbnails automatically</li>
+<li><strong>Auto-generate:</strong> YouTube & Google Drive videos get high-quality thumbnails automatically</li>
+<li><strong>Google Drive:</strong> Enhanced thumbnail extraction using Google Drive API endpoints</li>
 <li><strong>Custom thumbnails:</strong> Upload your own thumbnail to any image hosting service</li>
 <li><strong>Better browsing:</strong> Videos now show preview images in the gallery</li>
 <li><strong>Fallback:</strong> Generic video thumbnails for unsupported platforms</li>
@@ -961,7 +1309,12 @@ Thumbnail not available
 
 {/* Tags Field */}
 <div style={{marginBottom: '30px'}}>
-<label htmlFor="tags" style={{display: 'block',marginBottom: '8px',fontWeight: 'bold',color: '#333'}}>
+<label htmlFor="tags" style={{
+display: 'block',
+marginBottom: '8px',
+fontWeight: 'bold',
+color: '#333'
+}}>
 Tags
 </label>
 <input
@@ -970,7 +1323,14 @@ id="tags"
 value={tags}
 onChange={(e)=> setTags(e.target.value)}
 placeholder="training,match,team,highlights (separate with commas)"
-style={{width: '100%',padding: '12px',border: '2px solid #ddd',borderRadius: '8px',fontSize: '16px',boxSizing: 'border-box'}}
+style={{
+width: '100%',
+padding: '12px',
+border: '2px solid #ddd',
+borderRadius: '8px',
+fontSize: '16px',
+boxSizing: 'border-box'
+}}
 />
 <small style={{color: '#666',fontSize: '14px'}}>
 Separate multiple tags with commas
@@ -984,16 +1344,34 @@ initial={{opacity: 0,y: 10}}
 animate={{opacity: 1,y: 0}}
 style={{marginBottom: '20px'}}
 >
-<h3 style={{marginBottom: '10px',color: '#555',display: 'flex',alignItems: 'center',gap: '8px'}}>
+<h3 style={{
+marginBottom: '10px',
+color: '#555',
+display: 'flex',
+alignItems: 'center',
+gap: '8px'
+}}>
 <SafeIcon icon={FiImage} />
 Preview
 </h3>
-<div style={{border: '2px solid #e5e7eb',borderRadius: '12px',padding: '16px',backgroundColor: '#f9fafb'}}>
+<div style={{
+border: '2px solid #e5e7eb',
+borderRadius: '12px',
+padding: '16px',
+backgroundColor: '#f9fafb'
+}}>
 {mediaType==='image' ? (
 <img
 src={mediaUrl}
 alt="Preview"
-style={{maxWidth: '100%',height: 'auto',maxHeight: '300px',borderRadius: '8px',display: 'block',margin: '0 auto'}}
+style={{
+maxWidth: '100%',
+height: 'auto',
+maxHeight: '300px',
+borderRadius: '8px',
+display: 'block',
+margin: '0 auto'
+}}
 onError={(e)=> {
 e.target.style.display='none';
 e.target.nextElementSibling.style.display='block';
@@ -1002,7 +1380,17 @@ e.target.nextElementSibling.style.display='block';
 ) : (
 <div style={{display: 'flex',gap: '16px',alignItems: 'flex-start'}}>
 {/* Video preview placeholder */}
-<div style={{width: '300px',aspectRatio: '16/9',backgroundColor: '#f3f4f6',borderRadius: '8px',display: 'flex',alignItems: 'center',justifyContent: 'center',border: '2px dashed #d1d5db',flexShrink: 0}}>
+<div style={{
+width: '300px',
+aspectRatio: '16/9',
+backgroundColor: '#f3f4f6',
+borderRadius: '8px',
+display: 'flex',
+alignItems: 'center',
+justifyContent: 'center',
+border: '2px dashed #d1d5db',
+flexShrink: 0
+}}>
 <div style={{textAlign: 'center',color: '#6b7280'}}>
 <SafeIcon icon={FiPlay} style={{fontSize: '3rem',marginBottom: '8px'}} />
 <p>Video Preview</p>
@@ -1013,34 +1401,69 @@ e.target.nextElementSibling.style.display='block';
 {/* Thumbnail preview */}
 {(thumbnail || (autoThumbnail && mediaUrl)) && (
 <div style={{flex: 1}}>
-<p style={{fontSize: '14px',fontWeight: '600',color: '#374151',marginBottom: '8px'}}>
+<p style={{
+fontSize: '14px',
+fontWeight: '600',
+color: '#374151',
+marginBottom: '8px'
+}}>
 Thumbnail:
 </p>
 <img
 src={thumbnail || (autoThumbnail ? generateThumbnail(mediaUrl,videoType) : '')}
 alt="Thumbnail preview"
-style={{width: '160px',height: '90px',objectFit: 'cover',borderRadius: '8px',border: '2px solid #e5e7eb'}}
+style={{
+width: '160px',
+height: '90px',
+objectFit: 'cover',
+borderRadius: '8px',
+border: '2px solid #e5e7eb'
+}}
 onError={(e)=> {
 e.target.style.display='none';
 e.target.nextElementSibling.style.display='block';
 }}
 />
-<div style={{display: 'none',width: '160px',height: '90px',backgroundColor: '#f3f4f6',borderRadius: '8px',border: '2px solid #e5e7eb',alignItems: 'center',justifyContent: 'center',color: '#6b7280',fontSize: '12px'}}>
+<div style={{
+display: 'none',
+width: '160px',
+height: '90px',
+backgroundColor: '#f3f4f6',
+borderRadius: '8px',
+border: '2px solid #e5e7eb',
+alignItems: 'center',
+justifyContent: 'center',
+color: '#6b7280',
+fontSize: '12px'
+}}>
 Thumbnail not available
 </div>
 </div>
 )}
 </div>
 )}
-
-<div style={{display: 'none',textAlign: 'center',color: '#ef4444',padding: '20px'}}>
+<div style={{
+display: 'none',
+textAlign: 'center',
+color: '#ef4444',
+padding: '20px'
+}}>
 Unable to load preview
 </div>
-
-<div style={{marginTop: '12px',padding: '8px',backgroundColor: 'white',borderRadius: '8px',border: '1px solid #e5e7eb'}}>
+<div style={{
+marginTop: '12px',
+padding: '8px',
+backgroundColor: 'white',
+borderRadius: '8px',
+border: '1px solid #e5e7eb'
+}}>
 <strong style={{color: '#374151'}}>Title: {title}</strong>
 {description && (
-<p style={{margin: '4px 0 0 0',color: '#6b7280',fontSize: '14px'}}>
+<p style={{
+margin: '4px 0 0 0',
+color: '#6b7280',
+fontSize: '14px'
+}}>
 {description}
 </p>
 )}
@@ -1054,7 +1477,20 @@ Unable to load preview
 <button
 type="submit"
 disabled={isSubmitting || !mediaUrl.trim() || !title.trim()}
-style={{backgroundColor: isSubmitting || !mediaUrl.trim() || !title.trim() ? '#d1d5db' : '#059669',color: 'white',padding: '14px 32px',border: 'none',borderRadius: '8px',fontSize: '16px',fontWeight: 'bold',cursor: isSubmitting || !mediaUrl.trim() || !title.trim() ? 'not-allowed' : 'pointer',transition: 'all 0.2s',display: 'flex',alignItems: 'center',gap: '8px'}}
+style={{
+backgroundColor: isSubmitting || !mediaUrl.trim() || !title.trim() ? '#d1d5db' : '#059669',
+color: 'white',
+padding: '14px 32px',
+border: 'none',
+borderRadius: '8px',
+fontSize: '16px',
+fontWeight: 'bold',
+cursor: isSubmitting || !mediaUrl.trim() || !title.trim() ? 'not-allowed' : 'pointer',
+transition: 'all 0.2s',
+display: 'flex',
+alignItems: 'center',
+gap: '8px'
+}}
 onMouseOver={(e)=> {
 if (!isSubmitting && mediaUrl.trim() && title.trim()) {
 e.target.style.backgroundColor='#047857';
@@ -1070,7 +1506,14 @@ e.target.style.transform='translateY(0)';
 >
 {isSubmitting ? (
 <>
-<div style={{width: '16px',height: '16px',border: '2px solid #ffffff40',borderTop: '2px solid #ffffff',borderRadius: '50%',animation: 'spin 1s linear infinite'}} />
+<div style={{
+width: '16px',
+height: '16px',
+border: '2px solid #ffffff40',
+borderTop: '2px solid #ffffff',
+borderRadius: '50%',
+animation: 'spin 1s linear infinite'
+}} />
 {showEditForm ? 'Updating' : 'Saving to Database'}...
 </>
 ) : (
@@ -1085,7 +1528,20 @@ e.target.style.transform='translateY(0)';
 <button
 type="button"
 onClick={handleCancelEdit}
-style={{backgroundColor: '#6b7280',color: 'white',padding: '14px 32px',border: 'none',borderRadius: '8px',fontSize: '16px',fontWeight: 'bold',cursor: 'pointer',transition: 'all 0.2s',display: 'flex',alignItems: 'center',gap: '8px'}}
+style={{
+backgroundColor: '#6b7280',
+color: 'white',
+padding: '14px 32px',
+border: 'none',
+borderRadius: '8px',
+fontSize: '16px',
+fontWeight: 'bold',
+cursor: 'pointer',
+transition: 'all 0.2s',
+display: 'flex',
+alignItems: 'center',
+gap: '8px'
+}}
 onMouseOver={(e)=> {
 e.target.style.backgroundColor='#4b5563';
 }}
@@ -1107,22 +1563,57 @@ Cancel
 initial={{opacity: 0,y: 20}}
 animate={{opacity: 1,y: 0}}
 transition={{delay: 0.2}}
-style={{backgroundColor: 'white',padding: '24px',borderRadius: '12px',boxShadow: '0 4px 20px rgba(0,0,0,0.1)',marginBottom: '30px'}}
+style={{
+backgroundColor: 'white',
+padding: '24px',
+borderRadius: '12px',
+boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+marginBottom: '30px'
+}}
 >
-<div style={{display: 'flex',justifyContent: 'space-between',alignItems: 'center',marginBottom: '20px'}}>
-<h2 style={{color: '#555',margin: 0,display: 'flex',alignItems: 'center',gap: '8px'}}>
+<div style={{
+display: 'flex',
+justifyContent: 'space-between',
+alignItems: 'center',
+marginBottom: '20px'
+}}>
+<h2 style={{
+color: '#555',
+margin: 0,
+display: 'flex',
+alignItems: 'center',
+gap: '8px'
+}}>
 <SafeIcon icon={FiSearch} />
 Search & Filter Media
 </h2>
 <div style={{display: 'flex',alignItems: 'center',gap: '12px'}}>
 {activeFilterCount > 0 && (
-<span style={{backgroundColor: '#dbeafe',color: '#1e40af',padding: '4px 8px',borderRadius: '12px',fontSize: '12px',fontWeight: '600'}}>
+<span style={{
+backgroundColor: '#dbeafe',
+color: '#1e40af',
+padding: '4px 8px',
+borderRadius: '12px',
+fontSize: '12px',
+fontWeight: '600'
+}}>
 {activeFilterCount} filter{activeFilterCount !==1 ? 's' : ''} active
 </span>
 )}
 <button
 onClick={()=> setShowAdvancedFilters(!showAdvancedFilters)}
-style={{backgroundColor: '#f3f4f6',color: '#374151',border: '1px solid #d1d5db',padding: '8px 12px',borderRadius: '8px',cursor: 'pointer',fontSize: '14px',display: 'flex',alignItems: 'center',gap: '6px'}}
+style={{
+backgroundColor: '#f3f4f6',
+color: '#374151',
+border: '1px solid #d1d5db',
+padding: '8px 12px',
+borderRadius: '8px',
+cursor: 'pointer',
+fontSize: '14px',
+display: 'flex',
+alignItems: 'center',
+gap: '6px'
+}}
 >
 <SafeIcon icon={FiFilter} />
 {showAdvancedFilters ? 'Hide' : 'Show'} Filters
@@ -1130,7 +1621,18 @@ style={{backgroundColor: '#f3f4f6',color: '#374151',border: '1px solid #d1d5db',
 {activeFilterCount > 0 && (
 <button
 onClick={clearAllFilters}
-style={{backgroundColor: '#fee2e2',color: '#dc2626',border: '1px solid #fca5a5',padding: '8px 12px',borderRadius: '8px',cursor: 'pointer',fontSize: '14px',display: 'flex',alignItems: 'center',gap: '6px'}}
+style={{
+backgroundColor: '#fee2e2',
+color: '#dc2626',
+border: '1px solid #fca5a5',
+padding: '8px 12px',
+borderRadius: '8px',
+cursor: 'pointer',
+fontSize: '14px',
+display: 'flex',
+alignItems: 'center',
+gap: '6px'
+}}
 >
 <SafeIcon icon={FiRefreshCw} />
 Clear All
@@ -1142,16 +1644,27 @@ Clear All
 {/* Main Search Bar */}
 <div style={{marginBottom: showAdvancedFilters ? '20px' : '0'}}>
 <div style={{position: 'relative'}}>
-<SafeIcon
-icon={FiSearch}
-style={{position: 'absolute',left: '12px',top: '50%',transform: 'translateY(-50%)',color: '#6b7280',fontSize: '18px'}}
-/>
+<SafeIcon icon={FiSearch} style={{
+position: 'absolute',
+left: '12px',
+top: '50%',
+transform: 'translateY(-50%)',
+color: '#6b7280',
+fontSize: '18px'
+}} />
 <input
 type="text"
 value={searchQuery}
 onChange={(e)=> setSearchQuery(e.target.value)}
 placeholder="Search by title,description,or tags..."
-style={{width: '100%',padding: '12px 12px 12px 44px',border: '2px solid #d1d5db',borderRadius: '8px',fontSize: '16px',boxSizing: 'border-box'}}
+style={{
+width: '100%',
+padding: '12px 12px 12px 44px',
+border: '2px solid #d1d5db',
+borderRadius: '8px',
+fontSize: '16px',
+boxSizing: 'border-box'
+}}
 />
 </div>
 </div>
@@ -1162,19 +1675,39 @@ style={{width: '100%',padding: '12px 12px 12px 44px',border: '2px solid #d1d5db'
 initial={{opacity: 0,height: 0}}
 animate={{opacity: 1,height: 'auto'}}
 exit={{opacity: 0,height: 0}}
-style={{borderTop: '1px solid #e5e7eb',paddingTop: '20px'}}
+style={{
+borderTop: '1px solid #e5e7eb',
+paddingTop: '20px'
+}}
 >
-<div style={{display: 'grid',gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))',gap: '16px',marginBottom: '16px'}}>
+<div style={{
+display: 'grid',
+gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))',
+gap: '16px',
+marginBottom: '16px'
+}}>
 {/* Media Type Filter */}
 <div>
-<label style={{display: 'block',fontSize: '14px',fontWeight: '600',color: '#374151',marginBottom: '6px'}}>
+<label style={{
+display: 'block',
+fontSize: '14px',
+fontWeight: '600',
+color: '#374151',
+marginBottom: '6px'
+}}>
 <SafeIcon icon={FiType} style={{marginRight: '6px'}} />
 Media Type
 </label>
 <select
 value={selectedType}
 onChange={(e)=> setSelectedType(e.target.value)}
-style={{width: '100%',padding: '8px',border: '1px solid #d1d5db',borderRadius: '6px',fontSize: '14px'}}
+style={{
+width: '100%',
+padding: '8px',
+border: '1px solid #d1d5db',
+borderRadius: '6px',
+fontSize: '14px'
+}}
 >
 <option value="">All Types</option>
 <option value="image">Photos Only</option>
@@ -1185,14 +1718,26 @@ style={{width: '100%',padding: '8px',border: '1px solid #d1d5db',borderRadius: '
 {/* Tag Filter */}
 {allTags.length > 0 && (
 <div>
-<label style={{display: 'block',fontSize: '14px',fontWeight: '600',color: '#374151',marginBottom: '6px'}}>
+<label style={{
+display: 'block',
+fontSize: '14px',
+fontWeight: '600',
+color: '#374151',
+marginBottom: '6px'
+}}>
 <SafeIcon icon={FiTag} style={{marginRight: '6px'}} />
 Tag
 </label>
 <select
 value={selectedTag}
 onChange={(e)=> setSelectedTag(e.target.value)}
-style={{width: '100%',padding: '8px',border: '1px solid #d1d5db',borderRadius: '6px',fontSize: '14px'}}
+style={{
+width: '100%',
+padding: '8px',
+border: '1px solid #d1d5db',
+borderRadius: '6px',
+fontSize: '14px'
+}}
 >
 <option value="">All Tags</option>
 {allTags.map(tag=> (
@@ -1206,14 +1751,26 @@ style={{width: '100%',padding: '8px',border: '1px solid #d1d5db',borderRadius: '
 
 {/* Sort By */}
 <div>
-<label style={{display: 'block',fontSize: '14px',fontWeight: '600',color: '#374151',marginBottom: '6px'}}>
+<label style={{
+display: 'block',
+fontSize: '14px',
+fontWeight: '600',
+color: '#374151',
+marginBottom: '6px'
+}}>
 <SafeIcon icon={FiCalendar} style={{marginRight: '6px'}} />
 Sort By
 </label>
 <select
 value={sortBy}
 onChange={(e)=> setSortBy(e.target.value)}
-style={{width: '100%',padding: '8px',border: '1px solid #d1d5db',borderRadius: '6px',fontSize: '14px'}}
+style={{
+width: '100%',
+padding: '8px',
+border: '1px solid #d1d5db',
+borderRadius: '6px',
+fontSize: '14px'
+}}
 >
 <option value="newest">Newest First</option>
 <option value="oldest">Oldest First</option>
@@ -1224,27 +1781,55 @@ style={{width: '100%',padding: '8px',border: '1px solid #d1d5db',borderRadius: '
 </div>
 
 {/* Date Range Filter */}
-<div style={{display: 'grid',gridTemplateColumns: '1fr 1fr',gap: '12px'}}>
+<div style={{
+display: 'grid',
+gridTemplateColumns: '1fr 1fr',
+gap: '12px'
+}}>
 <div>
-<label style={{display: 'block',fontSize: '14px',fontWeight: '600',color: '#374151',marginBottom: '6px'}}>
+<label style={{
+display: 'block',
+fontSize: '14px',
+fontWeight: '600',
+color: '#374151',
+marginBottom: '6px'
+}}>
 From Date
 </label>
 <input
 type="date"
 value={dateRange.start}
 onChange={(e)=> setDateRange({...dateRange,start: e.target.value})}
-style={{width: '100%',padding: '8px',border: '1px solid #d1d5db',borderRadius: '6px',fontSize: '14px'}}
+style={{
+width: '100%',
+padding: '8px',
+border: '1px solid #d1d5db',
+borderRadius: '6px',
+fontSize: '14px'
+}}
 />
 </div>
 <div>
-<label style={{display: 'block',fontSize: '14px',fontWeight: '600',color: '#374151',marginBottom: '6px'}}>
+<label style={{
+display: 'block',
+fontSize: '14px',
+fontWeight: '600',
+color: '#374151',
+marginBottom: '6px'
+}}>
 To Date
 </label>
 <input
 type="date"
 value={dateRange.end}
 onChange={(e)=> setDateRange({...dateRange,end: e.target.value})}
-style={{width: '100%',padding: '8px',border: '1px solid #d1d5db',borderRadius: '6px',fontSize: '14px'}}
+style={{
+width: '100%',
+padding: '8px',
+border: '1px solid #d1d5db',
+borderRadius: '6px',
+fontSize: '14px'
+}}
 />
 </div>
 </div>
@@ -1257,20 +1842,50 @@ style={{width: '100%',padding: '8px',border: '1px solid #d1d5db',borderRadius: '
 initial={{opacity: 0,y: 20}}
 animate={{opacity: 1,y: 0}}
 transition={{delay: 0.3}}
-style={{backgroundColor: 'white',padding: '30px',borderRadius: '12px',boxShadow: '0 4px 20px rgba(0,0,0,0.1)'}}
+style={{
+backgroundColor: 'white',
+padding: '30px',
+borderRadius: '12px',
+boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
+}}
 >
-<div style={{display: 'flex',justifyContent: 'space-between',alignItems: 'center',marginBottom: '25px'}}>
-<h2 style={{color: '#555',margin: 0,display: 'flex',alignItems: 'center',gap: '8px'}}>
+<div style={{
+display: 'flex',
+justifyContent: 'space-between',
+alignItems: 'center',
+marginBottom: '25px'
+}}>
+<h2 style={{
+color: '#555',
+margin: 0,
+display: 'flex',
+alignItems: 'center',
+gap: '8px'
+}}>
 <SafeIcon icon={FiImage} />
 Media Gallery {isAdmin && '(Database)'}
 </h2>
 <div style={{display: 'flex',alignItems: 'center',gap: '12px'}}>
 {searchQuery || selectedTag || selectedType || dateRange.start || dateRange.end ? (
-<span style={{color: '#666',fontSize: '14px',backgroundColor: '#dbeafe',padding: '6px 12px',borderRadius: '20px',fontWeight: '500'}}>
+<span style={{
+color: '#666',
+fontSize: '14px',
+backgroundColor: '#dbeafe',
+padding: '6px 12px',
+borderRadius: '20px',
+fontWeight: '500'
+}}>
 Showing {filteredMedia.length} of {media.length} items
 </span>
 ) : (
-<span style={{color: '#666',fontSize: '14px',backgroundColor: '#f3f4f6',padding: '6px 12px',borderRadius: '20px',fontWeight: '500'}}>
+<span style={{
+color: '#666',
+fontSize: '14px',
+backgroundColor: '#f3f4f6',
+padding: '6px 12px',
+borderRadius: '20px',
+fontWeight: '500'
+}}>
 {media.length} item{media.length !==1 ? 's' : ''} {isAdmin && 'in database'}
 </span>
 )}
@@ -1278,33 +1893,50 @@ Showing {filteredMedia.length} of {media.length} items
 </div>
 
 {filteredMedia.length===0 ? (
-<div style={{textAlign: 'center',padding: '60px 20px',color: '#6b7280',backgroundColor: '#f9fafb',borderRadius: '12px',border: '2px dashed #d1d5db'}}>
+<div style={{
+textAlign: 'center',
+padding: '60px 20px',
+color: '#6b7280',
+backgroundColor: '#f9fafb',
+borderRadius: '12px',
+border: '2px dashed #d1d5db'
+}}>
 <div style={{fontSize: '4rem',marginBottom: '20px'}}>
 {media.length===0 ? '📸🎥' : '🔍'}
 </div>
 <h3 style={{marginBottom: '10px',color: '#374151'}}>
-{media.length===0 ? 
-`No media ${isAdmin ? 'in database' : ''} yet` : 
-'No media matches your search'
-}
+{media.length===0 ? `No media ${isAdmin ? 'in database' : ''} yet` : 'No media matches your search'}
 </h3>
 <p>
 {media.length===0 ? 
-(isAdmin ? 'Upload your first photo or video using the form above to get started!' : 'No media has been uploaded yet. Check back later for updates!') :
+(isAdmin ? 'Upload your first photo or video using the form above to get started!' : 'No media has been uploaded yet. Check back later for updates!') : 
 'Try adjusting your search terms or filters to find what you\'re looking for.'
 }
 </p>
 {activeFilterCount > 0 && (
 <button
 onClick={clearAllFilters}
-style={{marginTop: '16px',backgroundColor: '#3b82f6',color: 'white',border: 'none',padding: '8px 16px',borderRadius: '8px',cursor: 'pointer',fontSize: '14px'}}
+style={{
+marginTop: '16px',
+backgroundColor: '#3b82f6',
+color: 'white',
+border: 'none',
+padding: '8px 16px',
+borderRadius: '8px',
+cursor: 'pointer',
+fontSize: '14px'
+}}
 >
 Clear All Filters
 </button>
 )}
 </div>
 ) : (
-<div style={{display: 'grid',gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))',gap: '20px'}}>
+<div style={{
+display: 'grid',
+gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))',
+gap: '20px'
+}}>
 {filteredMedia.map((item)=> (
 <motion.div
 key={item.id}
@@ -1312,7 +1944,14 @@ initial={{opacity: 0,y: 20}}
 animate={{opacity: 1,y: 0}}
 whileHover={{y: -4}}
 transition={{duration: 0.2}}
-style={{border: '1px solid #e5e7eb',borderRadius: '12px',overflow: 'hidden',backgroundColor: 'white',boxShadow: '0 4px 12px rgba(0,0,0,0.1)',cursor: 'pointer'}}
+style={{
+border: '1px solid #e5e7eb',
+borderRadius: '12px',
+overflow: 'hidden',
+backgroundColor: 'white',
+boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+cursor: 'pointer'
+}}
 onClick={()=> setSelectedMedia(item)}
 >
 {/* Media Thumbnail */}
@@ -1321,31 +1960,60 @@ onClick={()=> setSelectedMedia(item)}
 <img
 src={item.url}
 alt={item.title}
-style={{width: '100%',height: '100%',objectFit: 'cover'}}
+style={{
+width: '100%',
+height: '100%',
+objectFit: 'cover'
+}}
 onError={(e)=> {
 e.target.style.display='none';
 e.target.nextElementSibling.style.display='flex';
 }}
 />
 ) : (
-// NEW: Use thumbnail for videos
+// 🔧 REMOVED: All Google Drive badges and indicators from thumbnail
 <div style={{position: 'relative',width: '100%',height: '100%'}}>
 <img
 src={getVideoThumbnail(item)}
 alt={`${item.title} thumbnail`}
-style={{width: '100%',height: '100%',objectFit: 'cover'}}
+style={{
+width: '100%',
+height: '100%',
+objectFit: 'cover'
+}}
 onError={(e)=> {
 e.target.style.display='none';
 e.target.nextElementSibling.style.display='flex';
 }}
 />
 {/* Play button overlay */}
-<div style={{position: 'absolute',top: '50%',left: '50%',transform: 'translate(-50%,-50%)',width: '60px',height: '60px',backgroundColor: 'rgba(0,0,0,0.7)',borderRadius: '50%',display: 'flex',alignItems: 'center',justifyContent: 'center',color: 'white'}}>
+<div style={{
+position: 'absolute',
+top: '50%',
+left: '50%',
+transform: 'translate(-50%,-50%)',
+width: '60px',
+height: '60px',
+backgroundColor: 'rgba(0,0,0,0.7)',
+borderRadius: '50%',
+display: 'flex',
+alignItems: 'center',
+justifyContent: 'center',
+color: 'white'
+}}>
 <SafeIcon icon={FiPlay} style={{fontSize: '24px',marginLeft: '4px'}} />
 </div>
-
+{/* 🔧 REMOVED: Google Drive indicator badge */}
 {/* Fallback for broken thumbnails */}
-<div style={{display: 'none',width: '100%',height: '100%',background: 'linear-gradient(135deg,#667eea 0%,#764ba2 100%)',alignItems: 'center',justifyContent: 'center',color: 'white'}}>
+<div style={{
+display: 'none',
+width: '100%',
+height: '100%',
+background: 'linear-gradient(135deg,#667eea 0%,#764ba2 100%)',
+alignItems: 'center',
+justifyContent: 'center',
+color: 'white'
+}}>
 <div style={{textAlign: 'center'}}>
 <SafeIcon icon={FiPlay} style={{fontSize: '3rem',marginBottom: '8px'}} />
 <p style={{fontSize: '14px'}}>Video</p>
@@ -1355,14 +2023,36 @@ e.target.nextElementSibling.style.display='flex';
 )}
 
 {/* Fallback for broken images */}
-<div style={{display: 'none',position: 'absolute',top: 0,left: 0,right: 0,bottom: 0,backgroundColor: '#f3f4f6',alignItems: 'center',justifyContent: 'center',flexDirection: 'column',color: '#6b7280'}}>
+<div style={{
+display: 'none',
+position: 'absolute',
+top: 0,
+left: 0,
+right: 0,
+bottom: 0,
+backgroundColor: '#f3f4f6',
+alignItems: 'center',
+justifyContent: 'center',
+flexDirection: 'column',
+color: '#6b7280'
+}}>
 <SafeIcon icon={item.type==='image' ? FiImage : FiVideo} style={{fontSize: '2rem',marginBottom: '8px'}} />
 <span style={{fontSize: '14px'}}>Media not available</span>
 </div>
 
 {/* Media type badge */}
 <div style={{position: 'absolute',top: '8px',right: '8px'}}>
-<span style={{display: 'inline-flex',alignItems: 'center',gap: '4px',backgroundColor: item.type==='image' ? 'rgba(59,130,246,0.9)' : 'rgba(139,69,19,0.9)',color: 'white',padding: '4px 8px',borderRadius: '6px',fontSize: '12px',fontWeight: '600'}}>
+<span style={{
+display: 'inline-flex',
+alignItems: 'center',
+gap: '4px',
+backgroundColor: item.type==='image' ? 'rgba(59,130,246,0.9)' : 'rgba(139,69,19,0.9)',
+color: 'white',
+padding: '4px 8px',
+borderRadius: '6px',
+fontSize: '12px',
+fontWeight: '600'
+}}>
 <SafeIcon icon={item.type==='image' ? FiCamera : FiVideo} />
 {item.type==='image' ? 'Photo' : 'Video'}
 </span>
@@ -1370,14 +2060,33 @@ e.target.nextElementSibling.style.display='flex';
 
 {/* Admin action buttons - only show if admin */}
 {isAdmin && (
-<div style={{position: 'absolute',top: '8px',left: '8px',display: 'flex',gap: '6px'}}>
+<div style={{
+position: 'absolute',
+top: '8px',
+left: '8px',
+display: 'flex',
+gap: '6px'
+}}>
 {/* Edit button */}
 <button
 onClick={(e)=> {
 e.stopPropagation();
 handleEditMedia(item);
 }}
-style={{backgroundColor: 'rgba(34,197,94,0.9)',color: 'white',border: 'none',borderRadius: '6px',width: '32px',height: '32px',cursor: 'pointer',fontSize: '14px',display: 'flex',alignItems: 'center',justifyContent: 'center',transition: 'all 0.2s'}}
+style={{
+backgroundColor: 'rgba(34,197,94,0.9)',
+color: 'white',
+border: 'none',
+borderRadius: '6px',
+width: '32px',
+height: '32px',
+cursor: 'pointer',
+fontSize: '14px',
+display: 'flex',
+alignItems: 'center',
+justifyContent: 'center',
+transition: 'all 0.2s'
+}}
 onMouseOver={(e)=> {
 e.target.style.backgroundColor='rgba(34,197,94,1)';
 e.target.style.transform='scale(1.1)';
@@ -1390,14 +2099,26 @@ title="Edit media"
 >
 <SafeIcon icon={FiEdit3} />
 </button>
-
 {/* Delete button */}
 <button
 onClick={(e)=> {
 e.stopPropagation();
 deleteMedia(item.id);
 }}
-style={{backgroundColor: 'rgba(239,68,68,0.9)',color: 'white',border: 'none',borderRadius: '6px',width: '32px',height: '32px',cursor: 'pointer',fontSize: '14px',display: 'flex',alignItems: 'center',justifyContent: 'center',transition: 'all 0.2s'}}
+style={{
+backgroundColor: 'rgba(239,68,68,0.9)',
+color: 'white',
+border: 'none',
+borderRadius: '6px',
+width: '32px',
+height: '32px',
+cursor: 'pointer',
+fontSize: '14px',
+display: 'flex',
+alignItems: 'center',
+justifyContent: 'center',
+transition: 'all 0.2s'
+}}
 onMouseOver={(e)=> {
 e.target.style.backgroundColor='rgba(239,68,68,1)';
 e.target.style.transform='scale(1.1)';
@@ -1417,13 +2138,25 @@ title="Delete media"
 {/* Media Details */}
 <div style={{padding: '16px'}}>
 {/* Title - Display in bold */}
-<h3 style={{margin: '0 0 8px 0',fontSize: '16px',fontWeight: 'bold',color: '#1f2937',lineHeight: '1.3'}}>
+<h3 style={{
+margin: '0 0 8px 0',
+fontSize: '16px',
+fontWeight: 'bold',
+color: '#1f2937',
+lineHeight: '1.3'
+}}>
 {item.title}
+{/* 🔧 REMOVED: Google Drive enhanced indicator */}
 </h3>
 
 {/* Description */}
 {item.description && (
-<p style={{margin: '0 0 12px 0',fontSize: '14px',lineHeight: '1.4',color: '#6b7280'}}>
+<p style={{
+margin: '0 0 12px 0',
+fontSize: '14px',
+lineHeight: '1.4',
+color: '#6b7280'
+}}>
 {item.description}
 </p>
 )}
@@ -1434,7 +2167,19 @@ title="Delete media"
 {item.tags.slice(0,3).map((tag,index)=> (
 <span
 key={index}
-style={{display: 'inline-block',backgroundColor: selectedTag===tag ? '#dbeafe' : '#f3f4f6',color: selectedTag===tag ? '#1e40af' : '#6b7280',padding: '2px 8px',borderRadius: '12px',fontSize: '12px',marginRight: '6px',marginBottom: '4px',fontWeight: '500',cursor: 'pointer',border: selectedTag===tag ? '1px solid #3b82f6' : '1px solid transparent'}}
+style={{
+display: 'inline-block',
+backgroundColor: selectedTag===tag ? '#dbeafe' : '#f3f4f6',
+color: selectedTag===tag ? '#1e40af' : '#6b7280',
+padding: '2px 8px',
+borderRadius: '12px',
+fontSize: '12px',
+marginRight: '6px',
+marginBottom: '4px',
+fontWeight: '500',
+cursor: 'pointer',
+border: selectedTag===tag ? '1px solid #3b82f6' : '1px solid transparent'
+}}
 onClick={(e)=> {
 e.stopPropagation();
 setSelectedTag(selectedTag===tag ? '' : tag);
@@ -1452,7 +2197,15 @@ setSelectedTag(selectedTag===tag ? '' : tag);
 )}
 
 {/* Date and Type */}
-<div style={{fontSize: '12px',color: '#9ca3af',borderTop: '1px solid #f3f4f6',paddingTop: '8px',display: 'flex',justifyContent: 'space-between',alignItems: 'center'}}>
+<div style={{
+fontSize: '12px',
+color: '#9ca3af',
+borderTop: '1px solid #f3f4f6',
+paddingTop: '8px',
+display: 'flex',
+justifyContent: 'space-between',
+alignItems: 'center'
+}}>
 <span>Date: {item.date}</span>
 {isAdmin && (
 <span style={{color: '#16a34a',fontSize: '11px'}}>
@@ -1473,20 +2226,55 @@ setSelectedTag(selectedTag===tag ? '' : tag);
 initial={{opacity: 0}}
 animate={{opacity: 1}}
 exit={{opacity: 0}}
-style={{position: 'fixed',top: 0,left: 0,right: 0,bottom: 0,backgroundColor: 'rgba(0,0,0,0.8)',display: 'flex',alignItems: 'center',justifyContent: 'center',zIndex: 1000,padding: '20px'}}
+style={{
+position: 'fixed',
+top: 0,
+left: 0,
+right: 0,
+bottom: 0,
+backgroundColor: 'rgba(0,0,0,0.8)',
+display: 'flex',
+alignItems: 'center',
+justifyContent: 'center',
+zIndex: 1000,
+padding: '20px'
+}}
 onClick={()=> setSelectedMedia(null)}
 >
 <motion.div
 initial={{scale: 0.9,opacity: 0}}
 animate={{scale: 1,opacity: 1}}
 exit={{scale: 0.9,opacity: 0}}
-style={{backgroundColor: 'white',borderRadius: '12px',maxWidth: '90vw',maxHeight: '90vh',overflow: 'auto',position: 'relative'}}
+style={{
+backgroundColor: 'white',
+borderRadius: '12px',
+maxWidth: '90vw',
+maxHeight: '90vh',
+overflow: 'auto',
+position: 'relative'
+}}
 onClick={(e)=> e.stopPropagation()}
 >
 {/* Close button */}
 <button
 onClick={()=> setSelectedMedia(null)}
-style={{position: 'absolute',top: '12px',right: '12px',backgroundColor: 'rgba(0,0,0,0.7)',color: 'white',border: 'none',borderRadius: '50%',width: '40px',height: '40px',cursor: 'pointer',fontSize: '20px',zIndex: 1001,display: 'flex',alignItems: 'center',justifyContent: 'center'}}
+style={{
+position: 'absolute',
+top: '12px',
+right: '12px',
+backgroundColor: 'rgba(0,0,0,0.7)',
+color: 'white',
+border: 'none',
+borderRadius: '50%',
+width: '40px',
+height: '40px',
+cursor: 'pointer',
+fontSize: '20px',
+zIndex: 1001,
+display: 'flex',
+alignItems: 'center',
+justifyContent: 'center'
+}}
 >
 ×
 </button>
@@ -1499,7 +2287,23 @@ e.stopPropagation();
 handleEditMedia(selectedMedia);
 setSelectedMedia(null);
 }}
-style={{position: 'absolute',top: '12px',left: '12px',backgroundColor: 'rgba(34,197,94,0.9)',color: 'white',border: 'none',borderRadius: '8px',padding: '8px 12px',cursor: 'pointer',fontSize: '14px',zIndex: 1001,display: 'flex',alignItems: 'center',gap: '6px',fontWeight: '600'}}
+style={{
+position: 'absolute',
+top: '12px',
+left: '12px',
+backgroundColor: 'rgba(34,197,94,0.9)',
+color: 'white',
+border: 'none',
+borderRadius: '8px',
+padding: '8px 12px',
+cursor: 'pointer',
+fontSize: '14px',
+zIndex: 1001,
+display: 'flex',
+alignItems: 'center',
+gap: '6px',
+fontWeight: '600'
+}}
 title="Edit this media"
 >
 <SafeIcon icon={FiEdit3} />
@@ -1512,8 +2316,22 @@ Edit
 {renderMediaContent(selectedMedia)}
 
 {/* Enhanced fallback error message */}
-<div style={{display: 'none',width: '100%',height: '300px',flexDirection: 'column',alignItems: 'center',justifyContent: 'center',padding: '40px',textAlign: 'center',backgroundColor: '#f9fafb'}}>
-<SafeIcon icon={selectedMedia.type==='image' ? FiImage : FiVideo} style={{fontSize: '4rem',color: '#d1d5db',marginBottom: '16px'}} />
+<div style={{
+display: 'none',
+width: '100%',
+height: '300px',
+flexDirection: 'column',
+alignItems: 'center',
+justifyContent: 'center',
+padding: '40px',
+textAlign: 'center',
+backgroundColor: '#f9fafb'
+}}>
+<SafeIcon icon={selectedMedia.type==='image' ? FiImage : FiVideo} style={{
+fontSize: '4rem',
+color: '#d1d5db',
+marginBottom: '16px'
+}} />
 <p style={{color: '#6b7280',marginBottom: '16px'}}>
 Unable to load this {selectedMedia.type}
 </p>
@@ -1521,7 +2339,16 @@ Unable to load this {selectedMedia.type}
 href={selectedMedia.url}
 target="_blank"
 rel="noopener noreferrer"
-style={{backgroundColor: '#3b82f6',color: 'white',padding: '8px 16px',borderRadius: '8px',textDecoration: 'none',display: 'flex',alignItems: 'center',gap: '8px'}}
+style={{
+backgroundColor: '#3b82f6',
+color: 'white',
+padding: '8px 16px',
+borderRadius: '8px',
+textDecoration: 'none',
+display: 'flex',
+alignItems: 'center',
+gap: '8px'
+}}
 >
 <SafeIcon icon={FiExternalLink} />
 Open in New Tab
@@ -1529,32 +2356,44 @@ Open in New Tab
 </div>
 </div>
 
-{/* Enhanced Media Details */}
+{/* 🔧 CLEANED: Simplified Media Details - Removed all technical information */}
 <div style={{padding: '24px'}}>
 {/* Title */}
-<h2 style={{margin: '0 0 16px 0',color: '#1f2937',fontSize: '24px',fontWeight: 'bold',lineHeight: '1.3'}}>
+<h2 style={{
+margin: '0 0 16px 0',
+color: '#1f2937',
+fontSize: '24px',
+fontWeight: 'bold',
+lineHeight: '1.3'
+}}>
 {selectedMedia.title}
 </h2>
 
 {/* Description */}
 {selectedMedia.description && (
-<p style={{margin: '0 0 16px 0',fontSize: '16px',color: '#374151',lineHeight: '1.5'}}>
+<p style={{
+margin: '0 0 16px 0',
+fontSize: '16px',
+color: '#374151',
+lineHeight: '1.5'
+}}>
 {selectedMedia.description}
 </p>
 )}
 
-{/* Meta Info */}
-<div style={{display: 'grid',gridTemplateColumns: '1fr 1fr',gap: '16px',marginBottom: '16px'}}>
+{/* 🔧 SIMPLIFIED: Basic Info Only */}
+<div style={{
+display: 'grid',
+gridTemplateColumns: '1fr 1fr',
+gap: '16px',
+marginBottom: '16px'
+}}>
 <div>
 <h4 style={{fontWeight: '600',color: '#374151',marginBottom: '4px'}}>Type</h4>
 <div style={{display: 'flex',alignItems: 'center',gap: '6px'}}>
 <SafeIcon icon={selectedMedia.type==='image' ? FiCamera : FiVideo} />
 <span>{selectedMedia.type==='image' ? 'Photo' : 'Video'}</span>
-{selectedMedia.videoType && (
-<span style={{fontSize: '12px',color: '#6b7280'}}>
-({selectedMedia.videoType})
-</span>
-)}
+{/* 🔧 REMOVED: Video source/type details */}
 </div>
 </div>
 <div>
@@ -1568,29 +2407,7 @@ Open in New Tab
 </div>
 </div>
 
-{/* NEW: Thumbnail info for videos */}
-{selectedMedia.type==='video' && (
-<div style={{marginBottom: '16px'}}>
-<h4 style={{fontWeight: '600',color: '#374151',marginBottom: '4px'}}>Thumbnail</h4>
-<div style={{display: 'flex',alignItems: 'center',gap: '12px'}}>
-<img
-src={getVideoThumbnail(selectedMedia)}
-alt="Video thumbnail"
-style={{width: '80px',height: '45px',objectFit: 'cover',borderRadius: '4px',border: '1px solid #e5e7eb'}}
-onError={(e)=> {
-e.target.style.display='none';
-e.target.nextElementSibling.style.display='block';
-}}
-/>
-<div style={{display: 'none',width: '80px',height: '45px',backgroundColor: '#f3f4f6',borderRadius: '4px',border: '1px solid #e5e7eb',alignItems: 'center',justifyContent: 'center',color: '#6b7280',fontSize: '10px'}}>
-No thumbnail
-</div>
-<span style={{fontSize: '14px',color: '#6b7280'}}>
-{selectedMedia.thumbnail ? 'Custom thumbnail' : 'Auto-generated thumbnail'}
-</span>
-</div>
-</div>
-)}
+{/* 🔧 REMOVED: Entire Thumbnail section for videos */}
 
 {/* Tags */}
 {selectedMedia.tags && selectedMedia.tags.length > 0 && (
@@ -1600,7 +2417,18 @@ No thumbnail
 {selectedMedia.tags.map((tag,index)=> (
 <span
 key={index}
-style={{display: 'inline-flex',alignItems: 'center',backgroundColor: '#dbeafe',color: '#1e40af',padding: '6px 12px',borderRadius: '16px',fontSize: '14px',fontWeight: '500',border: '1px solid #bfdbfe',cursor: 'pointer'}}
+style={{
+display: 'inline-flex',
+alignItems: 'center',
+backgroundColor: '#dbeafe',
+color: '#1e40af',
+padding: '6px 12px',
+borderRadius: '16px',
+fontSize: '14px',
+fontWeight: '500',
+border: '1px solid #bfdbfe',
+cursor: 'pointer'
+}}
 onClick={(e)=> {
 e.stopPropagation();
 setSelectedTag(tag);
@@ -1618,20 +2446,36 @@ setSelectedMedia(null);
 </motion.div>
 )}
 
-{/* Instructions with thumbnail information - ONLY show for admins */}
+{/* Instructions with Google Drive thumbnail information - ONLY show for admins */}
 {isAdmin && (
 <motion.div
 initial={{opacity: 0,y: 20}}
 animate={{opacity: 1,y: 0}}
 transition={{delay: 0.4}}
-style={{marginTop: '30px',padding: '24px',backgroundColor: '#f0f9ff',borderRadius: '12px',border: '1px solid #0ea5e9'}}
+style={{
+marginTop: '30px',
+padding: '24px',
+backgroundColor: '#f0f9ff',
+borderRadius: '12px',
+border: '1px solid #0ea5e9'
+}}
 >
-<h3 style={{marginBottom: '16px',color: '#0c4a6e',display: 'flex',alignItems: 'center',gap: '8px'}}>
+<h3 style={{
+marginBottom: '16px',
+color: '#0c4a6e',
+display: 'flex',
+alignItems: 'center',
+gap: '8px'
+}}>
 <SafeIcon icon={FiInfo} />
-Admin Instructions & Features (Database Storage + Thumbnails + Search)
+Admin Instructions & Features (Enhanced Google Drive Support)
 </h3>
 <div>
-<div style={{display: 'grid',gridTemplateColumns: '1fr 1fr',gap: '24px'}}>
+<div style={{
+display: 'grid',
+gridTemplateColumns: '1fr 1fr',
+gap: '24px'
+}}>
 <div>
 <h4 style={{fontWeight: '600',color: '#0c4a6e',marginBottom: '8px'}}>For Photos:</h4>
 <ul style={{color: '#075985',lineHeight: '1.6',paddingLeft: '20px'}}>
@@ -1642,18 +2486,46 @@ Admin Instructions & Features (Database Storage + Thumbnails + Search)
 </ul>
 </div>
 <div>
-<h4 style={{fontWeight: '600',color: '#0c4a6e',marginBottom: '8px'}}>For Videos:</h4>
+<h4 style={{fontWeight: '600',color: '#0c4a6e',marginBottom: '8px'}}>Enhanced Google Drive Videos:</h4>
 <ul style={{color: '#075985',lineHeight: '1.6',paddingLeft: '20px'}}>
-<li>Choose your video source (YouTube,Bunny.net,etc.)</li>
-<li>Paste any video URL - it will be automatically processed</li>
-<li><strong>🖼️ NEW:</strong> Thumbnail support with auto-generation!</li>
-<li><strong>✅ DATABASE:</strong> All videos are saved to Supabase database</li>
+<li><strong>🖼️ NEW:</strong> Automatic high-quality thumbnail extraction!</li>
+<li><strong>🔄 Multiple Methods:</strong> Uses Google Drive API endpoints for thumbnails</li>
+<li><strong>📱 Better Display:</strong> Videos show actual video frames instead of generic icons</li>
+<li><strong>🎯 Smart Fallbacks:</strong> Multiple thumbnail URL formats for reliability</li>
+<li><strong>✨ Bulk Update:</strong> Auto-update thumbnails for existing Google Drive videos</li>
 </ul>
 </div>
 </div>
 
-{/* NEW: Search Features Section */}
-<div style={{marginTop: '16px',padding: '12px',backgroundColor: '#e0f2fe',borderRadius: '8px',border: '1px solid #0891b2'}}>
+{/* Google Drive Enhanced Features Section */}
+<div style={{
+marginTop: '16px',
+padding: '12px',
+backgroundColor: '#dcfce7',
+borderRadius: '8px',
+border: '1px solid #16a34a'
+}}>
+<p style={{color: '#14532d',margin: '0 0 8px 0'}}>
+<strong>GOOGLE DRIVE ENHANCEMENTS:</strong>
+</p>
+<ul style={{color: '#14532d',lineHeight: '1.6',paddingLeft: '20px',margin: '0 0 8px 0'}}>
+<li><strong>Enhanced Thumbnail API:</strong> Uses Google Drive's thumbnail API endpoints for high-quality previews</li>
+<li><strong>Multiple Extraction Methods:</strong> Supports various Google Drive URL formats and file ID patterns</li>
+<li><strong>Automatic Detection:</strong> Detects Google Drive videos and applies enhanced thumbnail generation</li>
+<li><strong>Bulk Update Tool:</strong> Update existing Google Drive videos with new thumbnails in one click</li>
+<li><strong>Smart Fallbacks:</strong> Multiple thumbnail URL formats ensure maximum compatibility</li>
+<li><strong>Clean Interface:</strong> Technical labels hidden from users for better viewing experience</li>
+</ul>
+</div>
+
+{/* Search Features Section */}
+<div style={{
+marginTop: '16px',
+padding: '12px',
+backgroundColor: '#e0f2fe',
+borderRadius: '8px',
+border: '1px solid #0891b2'
+}}>
 <p style={{color: '#0e7490',margin: '0 0 8px 0'}}>
 <strong>🔍 POWERFUL SEARCH & FILTERING:</strong>
 </p>
@@ -1668,21 +2540,12 @@ Admin Instructions & Features (Database Storage + Thumbnails + Search)
 </ul>
 </div>
 
-{/* Thumbnail Features Section */}
-<div style={{marginTop: '16px',padding: '12px',backgroundColor: '#fef3c7',borderRadius: '8px',border: '1px solid #f59e0b'}}>
-<p style={{color: '#92400e',margin: '0 0 8px 0'}}>
-<strong>🖼️ VIDEO THUMBNAIL FEATURES:</strong>
-</p>
-<ul style={{color: '#92400e',lineHeight: '1.6',paddingLeft: '20px',margin: '0 0 8px 0'}}>
-<li><strong>Auto-Generation:</strong> YouTube videos automatically get high-quality thumbnails</li>
-<li><strong>Custom Thumbnails:</strong> Upload your own thumbnails to any image hosting service</li>
-<li><strong>Better Gallery:</strong> Videos now show preview images instead of generic play buttons</li>
-<li><strong>Fallback Support:</strong> Generic video thumbnails for unsupported platforms</li>
-<li><strong>Easy Management:</strong> Toggle between auto-generated and custom thumbnails</li>
-</ul>
-</div>
-
-<div style={{marginTop: '16px',padding: '12px',backgroundColor: 'white',borderRadius: '8px'}}>
+<div style={{
+marginTop: '16px',
+padding: '12px',
+backgroundColor: 'white',
+borderRadius: '8px'
+}}>
 <p style={{color: '#075985',margin: '0 0 8px 0'}}>
 <strong>🗄️ DATABASE FEATURES:</strong>
 </p>
@@ -1705,8 +2568,8 @@ Admin Instructions & Features (Database Storage + Thumbnails + Search)
 {/* Spinning animation for loading */}
 <style jsx>{`
 @keyframes spin {
-0% {transform: rotate(0deg);}
-100% {transform: rotate(360deg);}
+0% { transform: rotate(0deg); }
+100% { transform: rotate(360deg); }
 }
 `}</style>
 </div>

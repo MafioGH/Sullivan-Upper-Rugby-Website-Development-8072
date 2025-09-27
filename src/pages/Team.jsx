@@ -1,4 +1,4 @@
-import React,{useState} from 'react';
+import React,{useState,useCallback,useMemo} from 'react';
 import {motion} from 'framer-motion';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
@@ -16,6 +16,7 @@ const [showAddForm,setShowAddForm]=useState(false);
 const [editingPlayer,setEditingPlayer]=useState(null);
 const [editingCoach,setEditingCoach]=useState(null);
 
+// 🔧 FIXED: Stable state management to prevent re-rendering on every keystroke
 const [newPlayer,setNewPlayer]=useState({
 name: '',
 position: '',
@@ -47,21 +48,47 @@ bio: '',
 headCoach: false
 });
 
-const positions=[
+// 🔧 FIXED: Memoized constants to prevent re-creation on every render
+const positions=useMemo(()=> [
 'Prop','Hooker','Lock','Flanker','Number 8','Scrum-Half','Fly-Half','Centre','Wing','Full-Back'
-];
+],[]);
 
-const coachingRoles=[
+const coachingRoles=useMemo(()=> [
 'Head Coach','Assistant Coach','Forwards Coach','Backs Coach','Skills Coach','Fitness Coach','Team Manager','Physiotherapist','Kit Manager'
-];
+],[]);
 
-// Player handlers
-const handleAddPlayer=async (e)=> {
+// 🔧 FIXED: Memoized and stable input handlers to prevent re-rendering
+const handlePlayerInputChange=useCallback((field,value)=> {
+setNewPlayer(prev=> ({
+...prev,
+[field]: value
+}));
+},[]);
+
+const handleCoachInputChange=useCallback((field,value)=> {
+setNewCoach(prev=> ({
+...prev,
+[field]: value
+}));
+},[]);
+
+const handleStatsChange=useCallback((stat,value)=> {
+setNewPlayer(prev=> ({
+...prev,
+stats: {
+...prev.stats,
+[stat]: value
+}
+}));
+},[]);
+
+// 🔧 FIXED: Stable form handlers
+const handleAddPlayer=useCallback(async (e)=> {
 e.preventDefault();
 const playerData={
 ...newPlayer,
 number: newPlayer.number ? parseInt(newPlayer.number) : null,
-age: newPlayer.age ? parseInt(newPlayer.age) : null,// Make age optional
+age: newPlayer.age ? parseInt(newPlayer.age) : null,
 stats: {
 tries: parseInt(newPlayer.stats.tries) || 0,
 conversions: parseInt(newPlayer.stats.conversions) || 0,
@@ -97,15 +124,15 @@ setShowAddForm(false);
 console.error("Error adding player:",error);
 alert("Failed to add player. Please try again.");
 }
-};
+},[newPlayer,addPlayer]);
 
-const handleEditPlayer=(player)=> {
+const handleEditPlayer=useCallback((player)=> {
 setEditingPlayer(player.id);
 setNewPlayer({
 name: player.name,
 position: player.position,
 number: player.number ? player.number.toString() : '',
-age: player.age ? player.age.toString() : '',// Handle null/undefined age
+age: player.age ? player.age.toString() : '',
 height: player.height || '',
 weight: player.weight || '',
 photo: player.photo,
@@ -119,14 +146,14 @@ lineouts: player.stats?.lineouts || 0,
 appearances: player.stats?.appearances || 0
 }
 });
-};
+},[]);
 
-const handleUpdatePlayer=async (e)=> {
+const handleUpdatePlayer=useCallback(async (e)=> {
 e.preventDefault();
 const updateData={
 ...newPlayer,
 number: newPlayer.number ? parseInt(newPlayer.number) : null,
-age: newPlayer.age ? parseInt(newPlayer.age) : null,// Make age optional
+age: newPlayer.age ? parseInt(newPlayer.age) : null,
 stats: {
 tries: parseInt(newPlayer.stats.tries) || 0,
 conversions: parseInt(newPlayer.stats.conversions) || 0,
@@ -162,9 +189,9 @@ appearances: 0
 console.error("Error updating player:",error);
 alert("Failed to update player. Please try again.");
 }
-};
+},[newPlayer,editingPlayer,updatePlayer]);
 
-const handleDeletePlayer=async (id,name)=> {
+const handleDeletePlayer=useCallback(async (id,name)=> {
 if (window.confirm(`Are you sure you want to delete ${name}? This action cannot be undone.`)) {
 try {
 await deletePlayer(id);
@@ -173,10 +200,10 @@ console.error("Error deleting player:",error);
 alert("Failed to delete player. Please try again.");
 }
 }
-};
+},[deletePlayer]);
 
-// Coach handlers
-const handleAddCoach=async (e)=> {
+// 🔧 FIXED: Coach handlers with stable callbacks
+const handleAddCoach=useCallback(async (e)=> {
 e.preventDefault();
 try {
 await addCoach(newCoach);
@@ -196,9 +223,9 @@ setShowAddForm(false);
 console.error("Error adding coach:",error);
 alert("Failed to add coach. Please try again.");
 }
-};
+},[newCoach,addCoach]);
 
-const handleEditCoach=(coach)=> {
+const handleEditCoach=useCallback((coach)=> {
 setEditingCoach(coach.id);
 setNewCoach({
 name: coach.name,
@@ -211,9 +238,9 @@ photo: coach.photo,
 bio: coach.bio || '',
 headCoach: coach.headCoach || false
 });
-};
+},[]);
 
-const handleUpdateCoach=async (e)=> {
+const handleUpdateCoach=useCallback(async (e)=> {
 e.preventDefault();
 try {
 await updateCoach(editingCoach,newCoach);
@@ -233,9 +260,9 @@ headCoach: false
 console.error("Error updating coach:",error);
 alert("Failed to update coach. Please try again.");
 }
-};
+},[newCoach,editingCoach,updateCoach]);
 
-const handleDeleteCoach=async (id,name)=> {
+const handleDeleteCoach=useCallback(async (id,name)=> {
 if (window.confirm(`Are you sure you want to delete ${name}? This action cannot be undone.`)) {
 try {
 await deleteCoach(id);
@@ -244,9 +271,9 @@ console.error("Error deleting coach:",error);
 alert("Failed to delete coach. Please try again.");
 }
 }
-};
+},[deleteCoach]);
 
-const handleCancelEdit=()=> {
+const handleCancelEdit=useCallback(()=> {
 setEditingPlayer(null);
 setEditingCoach(null);
 setShowAddForm(false);
@@ -279,35 +306,294 @@ photo: '',
 bio: '',
 headCoach: false
 });
-};
+},[]);
 
-const handleStatsChange=(stat,value)=> {
-setNewPlayer({
-...newPlayer,
-stats: {
-...newPlayer.stats,
-[stat]: value
-}
-});
-};
-
-const sortedPlayers=[...players].sort((a,b)=> {
-// Sort by number if both have numbers,otherwise by name
+// 🔧 FIXED: Memoized sorted arrays to prevent re-sorting on every render
+const sortedPlayers=useMemo(()=> {
+return [...players].sort((a,b)=> {
 if (a.number && b.number) return a.number - b.number;
 if (a.number && !b.number) return -1;
 if (!a.number && b.number) return 1;
 return a.name.localeCompare(b.name);
 });
+},[players]);
 
-const sortedCoaches=[...coaches].sort((a,b)=> {
-// Head coach first,then alphabetically
+const sortedCoaches=useMemo(()=> {
+return [...coaches].sort((a,b)=> {
 if (a.headCoach && !b.headCoach) return -1;
 if (!a.headCoach && b.headCoach) return 1;
 return a.name.localeCompare(b.name);
 });
+},[coaches]);
 
 // Check if user is admin
 const isAdmin=localStorage.getItem('rugbyAdminAuth')==='true';
+
+// 🔧 FIXED: Memoized input components to prevent recreation
+const PlayerFormInputs=useMemo(()=> (
+<>
+<div>
+<label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+<input
+type="text"
+value={newPlayer.name}
+onChange={(e)=> handlePlayerInputChange('name',e.target.value)}
+className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+required
+/>
+</div>
+<div>
+<label className="block text-sm font-medium text-gray-700 mb-1">Position *</label>
+<select
+value={newPlayer.position}
+onChange={(e)=> handlePlayerInputChange('position',e.target.value)}
+className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+required
+>
+<option value="">Select Position</option>
+{positions.map(pos=> (
+<option key={pos} value={pos}>{pos}</option>
+))}
+</select>
+</div>
+<div>
+<label className="block text-sm font-medium text-gray-700 mb-1">Jersey Number (Optional)</label>
+<input
+type="number"
+value={newPlayer.number}
+onChange={(e)=> handlePlayerInputChange('number',e.target.value)}
+className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+min="1"
+max="99"
+placeholder="Leave empty if no number"
+/>
+</div>
+<div>
+<label className="block text-sm font-medium text-gray-700 mb-1">Age (Optional)</label>
+<input
+type="number"
+value={newPlayer.age}
+onChange={(e)=> handlePlayerInputChange('age',e.target.value)}
+className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+min="13"
+max="18"
+placeholder="Leave empty if not specified"
+/>
+</div>
+<div>
+<label className="block text-sm font-medium text-gray-700 mb-1">Height (Optional)</label>
+<input
+type="text"
+value={newPlayer.height}
+onChange={(e)=> handlePlayerInputChange('height',e.target.value)}
+className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+placeholder="e.g.,5'10&quot;"
+/>
+</div>
+<div>
+<label className="block text-sm font-medium text-gray-700 mb-1">Weight (Optional)</label>
+<input
+type="text"
+value={newPlayer.weight}
+onChange={(e)=> handlePlayerInputChange('weight',e.target.value)}
+className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+placeholder="e.g.,70kg"
+/>
+</div>
+<div>
+<label className="block text-sm font-medium text-gray-700 mb-1">Photo URL</label>
+<input
+type="url"
+value={newPlayer.photo}
+onChange={(e)=> handlePlayerInputChange('photo',e.target.value)}
+className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+placeholder="https://example.com/photo.jpg"
+/>
+</div>
+<div className="flex items-center">
+<input
+type="checkbox"
+id="captain"
+checked={newPlayer.captain}
+onChange={(e)=> handlePlayerInputChange('captain',e.target.checked)}
+className="mr-2"
+/>
+<label htmlFor="captain" className="text-sm font-medium text-gray-700">Team Captain</label>
+</div>
+</>
+),[newPlayer,handlePlayerInputChange,positions]);
+
+const PlayerStatsInputs=useMemo(()=> (
+<div className="md:col-span-2 mt-4">
+<h3 className="text-lg font-semibold text-gray-800 mb-3">Player Statistics</h3>
+<div className="bg-gray-50 rounded-lg p-4">
+<div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+<div>
+<label className="block text-sm font-medium text-gray-700 mb-1">Tries</label>
+<input
+type="number"
+value={newPlayer.stats.tries}
+onChange={(e)=> handleStatsChange('tries',e.target.value)}
+className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+min="0"
+/>
+</div>
+<div>
+<label className="block text-sm font-medium text-gray-700 mb-1">Conversions</label>
+<input
+type="number"
+value={newPlayer.stats.conversions}
+onChange={(e)=> handleStatsChange('conversions',e.target.value)}
+className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+min="0"
+/>
+</div>
+<div>
+<label className="block text-sm font-medium text-gray-700 mb-1">Penalties</label>
+<input
+type="number"
+value={newPlayer.stats.penalties}
+onChange={(e)=> handleStatsChange('penalties',e.target.value)}
+className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+min="0"
+/>
+</div>
+<div>
+<label className="block text-sm font-medium text-gray-700 mb-1">Tackles</label>
+<input
+type="number"
+value={newPlayer.stats.tackles}
+onChange={(e)=> handleStatsChange('tackles',e.target.value)}
+className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+min="0"
+/>
+</div>
+<div>
+<label className="block text-sm font-medium text-gray-700 mb-1">Lineouts Won</label>
+<input
+type="number"
+value={newPlayer.stats.lineouts}
+onChange={(e)=> handleStatsChange('lineouts',e.target.value)}
+className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+min="0"
+/>
+</div>
+<div>
+<label className="block text-sm font-medium text-gray-700 mb-1">Appearances</label>
+<input
+type="number"
+value={newPlayer.stats.appearances}
+onChange={(e)=> handleStatsChange('appearances',e.target.value)}
+className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+min="0"
+/>
+</div>
+</div>
+<p className="text-xs text-gray-500 mt-2">
+Enter the player's statistics for the current season.
+</p>
+</div>
+</div>
+),[newPlayer.stats,handleStatsChange]);
+
+const CoachFormInputs=useMemo(()=> (
+<>
+<div>
+<label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+<input
+type="text"
+value={newCoach.name}
+onChange={(e)=> handleCoachInputChange('name',e.target.value)}
+className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+required
+/>
+</div>
+<div>
+<label className="block text-sm font-medium text-gray-700 mb-1">Role *</label>
+<select
+value={newCoach.role}
+onChange={(e)=> handleCoachInputChange('role',e.target.value)}
+className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+required
+>
+<option value="">Select Role</option>
+{coachingRoles.map(role=> (
+<option key={role} value={role}>{role}</option>
+))}
+</select>
+</div>
+<div>
+<label className="block text-sm font-medium text-gray-700 mb-1">Qualifications</label>
+<input
+type="text"
+value={newCoach.qualifications}
+onChange={(e)=> handleCoachInputChange('qualifications',e.target.value)}
+className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+placeholder="e.g.,Level 2 Coaching,First Aid Certified"
+/>
+</div>
+<div>
+<label className="block text-sm font-medium text-gray-700 mb-1">Experience</label>
+<input
+type="text"
+value={newCoach.experience}
+onChange={(e)=> handleCoachInputChange('experience',e.target.value)}
+className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+placeholder="e.g.,5 years coaching,Former player"
+/>
+</div>
+<div>
+<label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+<input
+type="tel"
+value={newCoach.phone}
+onChange={(e)=> handleCoachInputChange('phone',e.target.value)}
+className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+placeholder="Optional contact number"
+/>
+</div>
+<div>
+<label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+<input
+type="email"
+value={newCoach.email}
+onChange={(e)=> handleCoachInputChange('email',e.target.value)}
+className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+placeholder="Optional email address"
+/>
+</div>
+<div>
+<label className="block text-sm font-medium text-gray-700 mb-1">Photo URL</label>
+<input
+type="url"
+value={newCoach.photo}
+onChange={(e)=> handleCoachInputChange('photo',e.target.value)}
+className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+placeholder="https://example.com/photo.jpg"
+/>
+</div>
+<div className="flex items-center">
+<input
+type="checkbox"
+id="headCoach"
+checked={newCoach.headCoach}
+onChange={(e)=> handleCoachInputChange('headCoach',e.target.checked)}
+className="mr-2"
+/>
+<label htmlFor="headCoach" className="text-sm font-medium text-gray-700">Head Coach</label>
+</div>
+<div className="md:col-span-2">
+<label className="block text-sm font-medium text-gray-700 mb-1">Biography</label>
+<textarea
+value={newCoach.bio}
+onChange={(e)=> handleCoachInputChange('bio',e.target.value)}
+className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+rows="4"
+placeholder="Brief biography,coaching philosophy,background,etc."
+/>
+</div>
+</>
+),[newCoach,handleCoachInputChange,coachingRoles]);
 
 const TeamContent=()=> {
 const loading=playersLoading || coachesLoading;
@@ -411,167 +697,8 @@ className="bg-white rounded-lg shadow-md p-6 mb-8"
 {/* Player Form */}
 {(activeTab==='players' || editingPlayer) && (
 <form onSubmit={editingPlayer ? handleUpdatePlayer : handleAddPlayer} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-<div>
-<label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
-<input
-type="text"
-value={newPlayer.name}
-onChange={(e)=> setNewPlayer({...newPlayer,name: e.target.value})}
-className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-required
-/>
-</div>
-<div>
-<label className="block text-sm font-medium text-gray-700 mb-1">Position *</label>
-<select
-value={newPlayer.position}
-onChange={(e)=> setNewPlayer({...newPlayer,position: e.target.value})}
-className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-required
->
-<option value="">Select Position</option>
-{positions.map(pos=> (
-<option key={pos} value={pos}>{pos}</option>
-))}
-</select>
-</div>
-<div>
-<label className="block text-sm font-medium text-gray-700 mb-1">Jersey Number (Optional)</label>
-<input
-type="number"
-value={newPlayer.number}
-onChange={(e)=> setNewPlayer({...newPlayer,number: e.target.value})}
-className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-min="1"
-max="99"
-placeholder="Leave empty if no number"
-/>
-</div>
-<div>
-<label className="block text-sm font-medium text-gray-700 mb-1">Age (Optional)</label>
-<input
-type="number"
-value={newPlayer.age}
-onChange={(e)=> setNewPlayer({...newPlayer,age: e.target.value})}
-className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-min="13"
-max="18"
-placeholder="Leave empty if not specified"
-/>
-</div>
-<div>
-<label className="block text-sm font-medium text-gray-700 mb-1">Height (Optional)</label>
-<input
-type="text"
-value={newPlayer.height}
-onChange={(e)=> setNewPlayer({...newPlayer,height: e.target.value})}
-className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-placeholder="e.g.,5'10&quot;"
-/>
-</div>
-<div>
-<label className="block text-sm font-medium text-gray-700 mb-1">Weight (Optional)</label>
-<input
-type="text"
-value={newPlayer.weight}
-onChange={(e)=> setNewPlayer({...newPlayer,weight: e.target.value})}
-className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-placeholder="e.g.,70kg"
-/>
-</div>
-<div>
-<label className="block text-sm font-medium text-gray-700 mb-1">Photo URL</label>
-<input
-type="url"
-value={newPlayer.photo}
-onChange={(e)=> setNewPlayer({...newPlayer,photo: e.target.value})}
-className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-placeholder="https://example.com/photo.jpg"
-/>
-</div>
-<div className="flex items-center">
-<input
-type="checkbox"
-id="captain"
-checked={newPlayer.captain}
-onChange={(e)=> setNewPlayer({...newPlayer,captain: e.target.checked})}
-className="mr-2"
-/>
-<label htmlFor="captain" className="text-sm font-medium text-gray-700">Team Captain</label>
-</div>
-
-{/* Player Statistics Section */}
-<div className="md:col-span-2 mt-4">
-<h3 className="text-lg font-semibold text-gray-800 mb-3">Player Statistics</h3>
-<div className="bg-gray-50 rounded-lg p-4">
-<div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-<div>
-<label className="block text-sm font-medium text-gray-700 mb-1">Tries</label>
-<input
-type="number"
-value={newPlayer.stats.tries}
-onChange={(e)=> handleStatsChange('tries',e.target.value)}
-className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-min="0"
-/>
-</div>
-<div>
-<label className="block text-sm font-medium text-gray-700 mb-1">Conversions</label>
-<input
-type="number"
-value={newPlayer.stats.conversions}
-onChange={(e)=> handleStatsChange('conversions',e.target.value)}
-className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-min="0"
-/>
-</div>
-<div>
-<label className="block text-sm font-medium text-gray-700 mb-1">Penalties</label>
-<input
-type="number"
-value={newPlayer.stats.penalties}
-onChange={(e)=> handleStatsChange('penalties',e.target.value)}
-className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-min="0"
-/>
-</div>
-<div>
-<label className="block text-sm font-medium text-gray-700 mb-1">Tackles</label>
-<input
-type="number"
-value={newPlayer.stats.tackles}
-onChange={(e)=> handleStatsChange('tackles',e.target.value)}
-className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-min="0"
-/>
-</div>
-<div>
-<label className="block text-sm font-medium text-gray-700 mb-1">Lineouts Won</label>
-<input
-type="number"
-value={newPlayer.stats.lineouts}
-onChange={(e)=> handleStatsChange('lineouts',e.target.value)}
-className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-min="0"
-/>
-</div>
-<div>
-<label className="block text-sm font-medium text-gray-700 mb-1">Appearances</label>
-<input
-type="number"
-value={newPlayer.stats.appearances}
-onChange={(e)=> handleStatsChange('appearances',e.target.value)}
-className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-min="0"
-/>
-</div>
-</div>
-<p className="text-xs text-gray-500 mt-2">
-Enter the player's statistics for the current season.
-</p>
-</div>
-</div>
-
+{PlayerFormInputs}
+{PlayerStatsInputs}
 <div className="md:col-span-2 flex space-x-4 mt-4">
 <button
 type="submit"
@@ -595,101 +722,7 @@ className="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transit
 {/* Coach Form */}
 {(activeTab==='coaches' || editingCoach) && (
 <form onSubmit={editingCoach ? handleUpdateCoach : handleAddCoach} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-<div>
-<label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
-<input
-type="text"
-value={newCoach.name}
-onChange={(e)=> setNewCoach({...newCoach,name: e.target.value})}
-className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-required
-/>
-</div>
-<div>
-<label className="block text-sm font-medium text-gray-700 mb-1">Role *</label>
-<select
-value={newCoach.role}
-onChange={(e)=> setNewCoach({...newCoach,role: e.target.value})}
-className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-required
->
-<option value="">Select Role</option>
-{coachingRoles.map(role=> (
-<option key={role} value={role}>{role}</option>
-))}
-</select>
-</div>
-<div>
-<label className="block text-sm font-medium text-gray-700 mb-1">Qualifications</label>
-<input
-type="text"
-value={newCoach.qualifications}
-onChange={(e)=> setNewCoach({...newCoach,qualifications: e.target.value})}
-className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-placeholder="e.g.,Level 2 Coaching,First Aid Certified"
-/>
-</div>
-<div>
-<label className="block text-sm font-medium text-gray-700 mb-1">Experience</label>
-<input
-type="text"
-value={newCoach.experience}
-onChange={(e)=> setNewCoach({...newCoach,experience: e.target.value})}
-className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-placeholder="e.g.,5 years coaching,Former player"
-/>
-</div>
-<div>
-<label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-<input
-type="tel"
-value={newCoach.phone}
-onChange={(e)=> setNewCoach({...newCoach,phone: e.target.value})}
-className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-placeholder="Optional contact number"
-/>
-</div>
-<div>
-<label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-<input
-type="email"
-value={newCoach.email}
-onChange={(e)=> setNewCoach({...newCoach,email: e.target.value})}
-className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-placeholder="Optional email address"
-/>
-</div>
-<div>
-<label className="block text-sm font-medium text-gray-700 mb-1">Photo URL</label>
-<input
-type="url"
-value={newCoach.photo}
-onChange={(e)=> setNewCoach({...newCoach,photo: e.target.value})}
-className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-placeholder="https://example.com/photo.jpg"
-/>
-</div>
-<div className="flex items-center">
-<input
-type="checkbox"
-id="headCoach"
-checked={newCoach.headCoach}
-onChange={(e)=> setNewCoach({...newCoach,headCoach: e.target.checked})}
-className="mr-2"
-/>
-<label htmlFor="headCoach" className="text-sm font-medium text-gray-700">Head Coach</label>
-</div>
-<div className="md:col-span-2">
-<label className="block text-sm font-medium text-gray-700 mb-1">Biography</label>
-<textarea
-value={newCoach.bio}
-onChange={(e)=> setNewCoach({...newCoach,bio: e.target.value})}
-className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-rows="4"
-placeholder="Brief biography,coaching philosophy,background,etc."
-/>
-</div>
-
+{CoachFormInputs}
 <div className="md:col-span-2 flex space-x-4 mt-4">
 <button
 type="submit"
@@ -729,7 +762,6 @@ src={player.photo || `https://images.unsplash.com/photo-1472099645785-5658abf4ff
 alt={player.name}
 className="w-full h-48 md:h-64 object-cover"
 style={{
-// Mobile-specific fix: Match coach photo aspect ratio
 '@media (max-width: 768px)': {
 height: '256px'
 }
