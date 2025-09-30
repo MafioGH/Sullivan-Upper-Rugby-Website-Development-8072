@@ -27,14 +27,7 @@ const [competition,setCompetition]=useState('Medallion Shield');
 const handleAddFixture=useCallback(async (e)=> {
 e.preventDefault();
 try {
-const fixtureData={
-opponent,
-date,
-time,
-venue,
-homeAway,
-competition
-};
+const fixtureData={opponent,date,time,venue,homeAway,competition};
 await addItem(fixtureData);
 // Reset form
 setOpponent('');
@@ -63,14 +56,7 @@ setCompetition(fixture.competition);
 const handleUpdateFixture=useCallback(async (e)=> {
 e.preventDefault();
 try {
-const updateData={
-opponent,
-date,
-time,
-venue,
-homeAway,
-competition
-};
+const updateData={opponent,date,time,venue,homeAway,competition};
 await updateItem(editingFixture,updateData);
 setEditingFixture(null);
 // Reset form
@@ -109,8 +95,19 @@ setHomeAway('Home');
 setCompetition('Medallion Shield');
 },[]);
 
-const isUpcoming=(date)=> {
-return new Date(date) > new Date();
+// 🔧 FIXED: Proper match completion logic with match duration consideration
+const isMatchCompleted=(date,time)=> {
+const now=new Date();
+const matchStartTime=new Date(`${date} ${time}`);
+// Rugby matches typically last 80 minutes + stoppage time + halftime = ~120 minutes (2 hours)
+const matchDurationMs=2 * 60 * 60 * 1000; // 2 hours in milliseconds
+const matchEndTime=new Date(matchStartTime.getTime() + matchDurationMs);
+return now > matchEndTime;
+};
+
+// 🔧 FIXED: Consistent upcoming check - match is upcoming if it hasn't been completed
+const isUpcoming=(date,time)=> {
+return !isMatchCompleted(date,time);
 };
 
 // Normalize team names for better matching
@@ -187,7 +184,6 @@ let result=results.find(result=> {
 if (result.date !==fixtureDate) return false;
 return normalizeTeamName(result.opponent)===normalizedFixtureOpponent;
 });
-
 if (result) return result;
 
 // Try partial match
@@ -197,7 +193,6 @@ const normalizedResultOpponent=normalizeTeamName(result.opponent);
 return normalizedResultOpponent.includes(normalizedFixtureOpponent) || 
 normalizedFixtureOpponent.includes(normalizedResultOpponent);
 });
-
 if (result) return result;
 
 // Try main word match for multi-word teams
@@ -205,7 +200,6 @@ result=results.find(result=> {
 if (result.date !==fixtureDate) return false;
 const fixtureWords=normalizedFixtureOpponent.split(' ');
 const resultWords=normalizeTeamName(result.opponent).split(' ');
-
 if (fixtureWords.length > 1 && resultWords.length > 1) {
 const fixtureMainWord=fixtureWords[0];
 const resultMainWord=resultWords[0];
@@ -227,7 +221,7 @@ const sortedFixtures=useMemo(()=> {
 return [...fixtures].sort((a,b)=> {
 const dateA=new Date(`${a.date} ${a.time}`);
 const dateB=new Date(`${b.date} ${b.time}`);
-return dateA - dateB;// Ascending order (earliest first)
+return dateA - dateB; // Ascending order (earliest first)
 });
 },[fixtures]);
 
@@ -371,12 +365,12 @@ className="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transit
 {/* Fixtures List - Sorted Chronologically */}
 <div className="space-y-4">
 {sortedFixtures.map((fixture,index)=> {
-const isNext=isUpcoming(fixture.date);
-const now=new Date();
+const isNext=isUpcoming(fixture.date,fixture.time);
 const fixtureDateTime=new Date(`${fixture.date} ${fixture.time}`);
-const isNextFixture=index===0 && isNext;// First fixture in sorted list that's upcoming
+const isNextFixture=index===0 && isNext; // First fixture in sorted list that's upcoming
 const fixtureHasResult=hasResult(fixture);
 const matchResult=getResult(fixture);
+const isCompleted=isMatchCompleted(fixture.date,fixture.time);
 
 return (
 <motion.div
@@ -385,9 +379,11 @@ initial={{opacity: 0,y: 20}}
 animate={{opacity: 1,y: 0}}
 transition={{delay: index * 0.1}}
 className={`bg-white rounded-lg shadow-md p-6 ${
-isNextFixture ? 'border-l-4 border-green-500 ring-2 ring-green-100' : 
-isNext ? 'border-l-4 border-blue-500' : 
-'opacity-75 border-l-4 border-gray-300'
+isNextFixture 
+? 'border-l-4 border-green-500 ring-2 ring-green-100' 
+: isNext 
+? 'border-l-4 border-blue-500' 
+: 'opacity-75 border-l-4 border-gray-300'
 }`}
 >
 <div className="flex flex-col md:flex-row md:items-center justify-between">
@@ -401,12 +397,12 @@ Sullivan Upper vs {fixture.opponent}
 NEXT MATCH
 </span>
 )}
-{!isNext && !fixtureHasResult && (
+{isCompleted && !fixtureHasResult && (
 <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
 COMPLETED
 </span>
 )}
-{!isNext && fixtureHasResult && (
+{isCompleted && fixtureHasResult && (
 <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-600">
 RESULT AVAILABLE
 </span>
@@ -429,7 +425,7 @@ RESULT AVAILABLE
 </div>
 
 {/* Show result score if available */}
-{!isNext && fixtureHasResult && matchResult && (
+{isCompleted && fixtureHasResult && matchResult && (
 <div className="mt-3 p-3 bg-gray-50 rounded-lg">
 <div className="flex items-center justify-between">
 <div className="flex items-center space-x-4">
@@ -437,12 +433,17 @@ RESULT AVAILABLE
 Final Score: {matchResult.sullivanScore} - {matchResult.opponentScore}
 </div>
 <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-matchResult.sullivanScore > matchResult.opponentScore ? 'bg-green-100 text-green-800' : 
-matchResult.sullivanScore < matchResult.opponentScore ? 'bg-red-100 text-red-800' : 
-'bg-yellow-100 text-yellow-800'
+matchResult.sullivanScore > matchResult.opponentScore 
+? 'bg-green-100 text-green-800' 
+: matchResult.sullivanScore < matchResult.opponentScore 
+? 'bg-red-100 text-red-800' 
+: 'bg-yellow-100 text-yellow-800'
 }`}>
-{matchResult.sullivanScore > matchResult.opponentScore ? 'WIN' : 
-matchResult.sullivanScore < matchResult.opponentScore ? 'LOSS' : 'DRAW'}
+{matchResult.sullivanScore > matchResult.opponentScore 
+? 'WIN' 
+: matchResult.sullivanScore < matchResult.opponentScore 
+? 'LOSS' 
+: 'DRAW'}
 </span>
 </div>
 <Link
@@ -457,8 +458,11 @@ className="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transit
 {matchResult.notes && (
 <div className="mt-2 text-sm text-gray-600">
 <p className="font-medium">Match Report Preview:</p>
-<div className="line-clamp-2 text-gray-700"
-dangerouslySetInnerHTML={{__html: matchResult.notes.replace(/<[^>]*>/g,'').substring(0,120) + '...'}}
+<div 
+className="line-clamp-2 text-gray-700" 
+dangerouslySetInnerHTML={{
+__html: matchResult.notes.replace(/<[^>]*>/g,'').substring(0,120) + '...'
+}} 
 />
 </div>
 )}
@@ -466,7 +470,7 @@ dangerouslySetInnerHTML={{__html: matchResult.notes.replace(/<[^>]*>/g,'').subst
 )}
 
 {/* Simple link to results page for completed fixtures without results */}
-{!isNext && !fixtureHasResult && (
+{isCompleted && !fixtureHasResult && (
 <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
 <div className="flex items-center space-x-2">
 <SafeIcon icon={FiFileText} className="w-4 h-4 text-blue-600" />
@@ -483,7 +487,9 @@ here
 
 <div className="mt-4 md:mt-0 flex items-center space-x-4">
 <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-fixture.homeAway==='Home' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
+fixture.homeAway==='Home' 
+? 'bg-green-100 text-green-800' 
+: 'bg-blue-100 text-blue-800'
 }`}>
 {fixture.homeAway}
 </span>
