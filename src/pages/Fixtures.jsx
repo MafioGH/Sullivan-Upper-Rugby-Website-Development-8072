@@ -1,4 +1,4 @@
-import React,{useState} from 'react';
+import React,{useState,useCallback,useMemo} from 'react';
 import {motion} from 'framer-motion';
 import {format} from 'date-fns';
 import {Link} from 'react-router-dom';
@@ -11,68 +11,82 @@ const {FiCalendar,FiMapPin,FiClock,FiPlus,FiEdit2,FiTrash2,FiSave,FiX,FiExternal
 const Fixtures=()=> {
 const {data: fixtures,loading,error,addItem,updateItem,deleteItem}=useSupabaseData('fixtures');
 const {data: results}=useSupabaseData('results');
+
 const [showAddForm,setShowAddForm]=useState(false);
 const [editingFixture,setEditingFixture]=useState(null);
-const [newFixture,setNewFixture]=useState({
-opponent: '',
-date: '',
-time: '',
-venue: '',
-homeAway: 'Home',
-competition: 'Medallion Shield'
-});
 
-const handleAddFixture=async (e)=> {
+// 🔧 FIXED: Individual state hooks to prevent object re-rendering
+const [opponent,setOpponent]=useState('');
+const [date,setDate]=useState('');
+const [time,setTime]=useState('');
+const [venue,setVenue]=useState('');
+const [homeAway,setHomeAway]=useState('Home');
+const [competition,setCompetition]=useState('Medallion Shield');
+
+// 🔧 FIXED: Stable form handlers
+const handleAddFixture=useCallback(async (e)=> {
 e.preventDefault();
 try {
-await addItem(newFixture);
-setNewFixture({
-opponent: '',
-date: '',
-time: '',
-venue: '',
-homeAway: 'Home',
-competition: 'Medallion Shield'
-});
+const fixtureData={
+opponent,
+date,
+time,
+venue,
+homeAway,
+competition
+};
+await addItem(fixtureData);
+// Reset form
+setOpponent('');
+setDate('');
+setTime('');
+setVenue('');
+setHomeAway('Home');
+setCompetition('Medallion Shield');
 setShowAddForm(false);
 } catch (error) {
 console.error("Error adding fixture:",error);
 alert("Failed to add fixture. Please try again.");
 }
-};
+},[opponent,date,time,venue,homeAway,competition,addItem]);
 
-const handleEditFixture=(fixture)=> {
+const handleEditFixture=useCallback((fixture)=> {
 setEditingFixture(fixture.id);
-setNewFixture({
-opponent: fixture.opponent,
-date: fixture.date,
-time: fixture.time,
-venue: fixture.venue,
-homeAway: fixture.homeAway,
-competition: fixture.competition
-});
-};
+setOpponent(fixture.opponent);
+setDate(fixture.date);
+setTime(fixture.time);
+setVenue(fixture.venue);
+setHomeAway(fixture.homeAway);
+setCompetition(fixture.competition);
+},[]);
 
-const handleUpdateFixture=async (e)=> {
+const handleUpdateFixture=useCallback(async (e)=> {
 e.preventDefault();
 try {
-await updateItem(editingFixture,newFixture);
+const updateData={
+opponent,
+date,
+time,
+venue,
+homeAway,
+competition
+};
+await updateItem(editingFixture,updateData);
 setEditingFixture(null);
-setNewFixture({
-opponent: '',
-date: '',
-time: '',
-venue: '',
-homeAway: 'Home',
-competition: 'Medallion Shield'
-});
+// Reset form
+setOpponent('');
+setDate('');
+setTime('');
+setVenue('');
+setHomeAway('Home');
+setCompetition('Medallion Shield');
 } catch (error) {
 console.error("Error updating fixture:",error);
 alert("Failed to update fixture. Please try again.");
 }
-};
+},[editingFixture,opponent,date,time,venue,homeAway,competition,updateItem]);
 
-const handleDeleteFixture=async (id,opponent)=> {
+const handleDeleteFixture=useCallback(async (id,opponent)=> {
 if (window.confirm(`Are you sure you want to delete the fixture against ${opponent}? This action cannot be undone.`)) {
 try {
 await deleteItem(id);
@@ -81,20 +95,19 @@ console.error("Error deleting fixture:",error);
 alert("Failed to delete fixture. Please try again.");
 }
 }
-};
+},[deleteItem]);
 
-const handleCancelEdit=()=> {
+const handleCancelEdit=useCallback(()=> {
 setEditingFixture(null);
 setShowAddForm(false);
-setNewFixture({
-opponent: '',
-date: '',
-time: '',
-venue: '',
-homeAway: 'Home',
-competition: 'Medallion Shield'
-});
-};
+// Reset form
+setOpponent('');
+setDate('');
+setTime('');
+setVenue('');
+setHomeAway('Home');
+setCompetition('Medallion Shield');
+},[]);
 
 const isUpcoming=(date)=> {
 return new Date(date) > new Date();
@@ -206,15 +219,17 @@ return result;
 
 // Create anchor ID for a specific match result
 const createMatchAnchorId=(date,opponent)=> {
-return `match-${date}-${opponent.toLowerCase().replace(/\s+/g, '-')}`;
+return `match-${date}-${opponent.toLowerCase().replace(/\s+/g,'-')}`;
 };
 
 // Sort fixtures chronologically - next fixture first,then future fixtures in date order
-const sortedFixtures=[...fixtures].sort((a,b)=> {
+const sortedFixtures=useMemo(()=> {
+return [...fixtures].sort((a,b)=> {
 const dateA=new Date(`${a.date} ${a.time}`);
 const dateB=new Date(`${b.date} ${b.time}`);
 return dateA - dateB;// Ascending order (earliest first)
 });
+},[fixtures]);
 
 // Check if user is admin
 const isAdmin=localStorage.getItem('rugbyAdminAuth')==='true';
@@ -275,8 +290,8 @@ className="bg-white rounded-lg shadow-md p-6 mb-8"
 <label className="block text-sm font-medium text-gray-700 mb-1">Opponent</label>
 <input
 type="text"
-value={newFixture.opponent}
-onChange={(e)=> setNewFixture({...newFixture,opponent: e.target.value})}
+value={opponent}
+onChange={(e)=> setOpponent(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 required
 />
@@ -285,8 +300,8 @@ required
 <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
 <input
 type="date"
-value={newFixture.date}
-onChange={(e)=> setNewFixture({...newFixture,date: e.target.value})}
+value={date}
+onChange={(e)=> setDate(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 required
 />
@@ -295,8 +310,8 @@ required
 <label className="block text-sm font-medium text-gray-700 mb-1">Time</label>
 <input
 type="time"
-value={newFixture.time}
-onChange={(e)=> setNewFixture({...newFixture,time: e.target.value})}
+value={time}
+onChange={(e)=> setTime(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 required
 />
@@ -304,8 +319,8 @@ required
 <div>
 <label className="block text-sm font-medium text-gray-700 mb-1">Home/Away</label>
 <select
-value={newFixture.homeAway}
-onChange={(e)=> setNewFixture({...newFixture,homeAway: e.target.value})}
+value={homeAway}
+onChange={(e)=> setHomeAway(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 >
 <option value="Home">Home</option>
@@ -316,8 +331,8 @@ className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none
 <label className="block text-sm font-medium text-gray-700 mb-1">Venue</label>
 <input
 type="text"
-value={newFixture.venue}
-onChange={(e)=> setNewFixture({...newFixture,venue: e.target.value})}
+value={venue}
+onChange={(e)=> setVenue(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 required
 />
@@ -326,8 +341,8 @@ required
 <label className="block text-sm font-medium text-gray-700 mb-1">Competition</label>
 <input
 type="text"
-value={newFixture.competition}
-onChange={(e)=> setNewFixture({...newFixture,competition: e.target.value})}
+value={competition}
+onChange={(e)=> setCompetition(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 required
 />
@@ -430,8 +445,8 @@ matchResult.sullivanScore < matchResult.opponentScore ? 'bg-red-100 text-red-800
 matchResult.sullivanScore < matchResult.opponentScore ? 'LOSS' : 'DRAW'}
 </span>
 </div>
-<Link 
-to={`/results#${createMatchAnchorId(matchResult.date, matchResult.opponent)}`}
+<Link
+to={`/results#${createMatchAnchorId(matchResult.date,matchResult.opponent)}`}
 className="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 text-sm"
 >
 <SafeIcon icon={FiFileText} className="w-4 h-4" />
@@ -442,9 +457,8 @@ className="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transit
 {matchResult.notes && (
 <div className="mt-2 text-sm text-gray-600">
 <p className="font-medium">Match Report Preview:</p>
-<div 
-className="line-clamp-2 text-gray-700" 
-dangerouslySetInnerHTML={{__html: matchResult.notes.replace(/<[^>]*>/g,'').substring(0,120) + '...'}} 
+<div className="line-clamp-2 text-gray-700"
+dangerouslySetInnerHTML={{__html: matchResult.notes.replace(/<[^>]*>/g,'').substring(0,120) + '...'}}
 />
 </div>
 )}
@@ -466,6 +480,7 @@ here
 </div>
 )}
 </div>
+
 <div className="mt-4 md:mt-0 flex items-center space-x-4">
 <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
 fixture.homeAway==='Home' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'

@@ -16,37 +16,34 @@ const [showAddForm,setShowAddForm]=useState(false);
 const [editingPlayer,setEditingPlayer]=useState(null);
 const [editingCoach,setEditingCoach]=useState(null);
 
-// 🔧 FIXED: Stable state management to prevent re-rendering on every keystroke
-const [newPlayer,setNewPlayer]=useState({
-name: '',
-position: '',
-number: '',
-age: '',
-height: '',
-weight: '',
-photo: '',
-captain: false,
-stats: {
-tries: 0,
-conversions: 0,
-penalties: 0,
-tackles: 0,
-lineouts: 0,
-appearances: 0
-}
-});
+// 🔧 FIXED: Individual player state hooks to prevent object re-rendering
+const [playerName,setPlayerName]=useState('');
+const [playerPosition,setPlayerPosition]=useState('');
+const [playerNumber,setPlayerNumber]=useState('');
+const [playerAge,setPlayerAge]=useState('');
+const [playerHeight,setPlayerHeight]=useState('');
+const [playerWeight,setPlayerWeight]=useState('');
+const [playerPhoto,setPlayerPhoto]=useState('');
+const [playerCaptain,setPlayerCaptain]=useState(false);
 
-const [newCoach,setNewCoach]=useState({
-name: '',
-role: '',
-qualifications: '',
-experience: '',
-phone: '',
-email: '',
-photo: '',
-bio: '',
-headCoach: false
-});
+// 🔧 FIXED: Individual player stats state hooks
+const [playerTries,setPlayerTries]=useState(0);
+const [playerConversions,setPlayerConversions]=useState(0);
+const [playerPenalties,setPlayerPenalties]=useState(0);
+const [playerTackles,setPlayerTackles]=useState(0);
+const [playerLineouts,setPlayerLineouts]=useState(0);
+const [playerAppearances,setPlayerAppearances]=useState(0);
+
+// 🔧 FIXED: Individual coach state hooks to prevent object re-rendering
+const [coachName,setCoachName]=useState('');
+const [coachRole,setCoachRole]=useState('');
+const [coachQualifications,setCoachQualifications]=useState('');
+const [coachExperience,setCoachExperience]=useState('');
+const [coachPhone,setCoachPhone]=useState('');
+const [coachEmail,setCoachEmail]=useState('');
+const [coachPhoto,setCoachPhoto]=useState('');
+const [coachBio,setCoachBio]=useState('');
+const [coachHeadCoach,setCoachHeadCoach]=useState(false);
 
 // 🔧 FIXED: Memoized constants to prevent re-creation on every render
 const positions=useMemo(()=> [
@@ -57,139 +54,114 @@ const coachingRoles=useMemo(()=> [
 'Head Coach','Assistant Coach','Forwards Coach','Backs Coach','Skills Coach','Fitness Coach','Team Manager','Physiotherapist','Kit Manager'
 ],[]);
 
-// 🔧 FIXED: Memoized and stable input handlers to prevent re-rendering
-const handlePlayerInputChange=useCallback((field,value)=> {
-setNewPlayer(prev=> ({
-...prev,
-[field]: value
-}));
-},[]);
-
-const handleCoachInputChange=useCallback((field,value)=> {
-setNewCoach(prev=> ({
-...prev,
-[field]: value
-}));
-},[]);
-
-const handleStatsChange=useCallback((stat,value)=> {
-setNewPlayer(prev=> ({
-...prev,
-stats: {
-...prev.stats,
-[stat]: value
-}
-}));
-},[]);
-
 // 🔧 FIXED: Stable form handlers
 const handleAddPlayer=useCallback(async (e)=> {
 e.preventDefault();
 const playerData={
-...newPlayer,
-number: newPlayer.number ? parseInt(newPlayer.number) : null,
-age: newPlayer.age ? parseInt(newPlayer.age) : null,
+name: playerName,
+position: playerPosition,
+number: playerNumber ? parseInt(playerNumber) : null,
+age: playerAge ? parseInt(playerAge) : null,
+height: playerHeight,
+weight: playerWeight,
+photo: playerPhoto,
+captain: playerCaptain,
 stats: {
-tries: parseInt(newPlayer.stats.tries) || 0,
-conversions: parseInt(newPlayer.stats.conversions) || 0,
-penalties: parseInt(newPlayer.stats.penalties) || 0,
-tackles: parseInt(newPlayer.stats.tackles) || 0,
-lineouts: parseInt(newPlayer.stats.lineouts) || 0,
-appearances: parseInt(newPlayer.stats.appearances) || 0
+tries: parseInt(playerTries) || 0,
+conversions: parseInt(playerConversions) || 0,
+penalties: parseInt(playerPenalties) || 0,
+tackles: parseInt(playerTackles) || 0,
+lineouts: parseInt(playerLineouts) || 0,
+appearances: parseInt(playerAppearances) || 0
 }
 };
 
 try {
 await addPlayer(playerData);
-setNewPlayer({
-name: '',
-position: '',
-number: '',
-age: '',
-height: '',
-weight: '',
-photo: '',
-captain: false,
-stats: {
-tries: 0,
-conversions: 0,
-penalties: 0,
-tackles: 0,
-lineouts: 0,
-appearances: 0
-}
-});
+// Reset all individual form fields
+setPlayerName('');
+setPlayerPosition('');
+setPlayerNumber('');
+setPlayerAge('');
+setPlayerHeight('');
+setPlayerWeight('');
+setPlayerPhoto('');
+setPlayerCaptain(false);
+setPlayerTries(0);
+setPlayerConversions(0);
+setPlayerPenalties(0);
+setPlayerTackles(0);
+setPlayerLineouts(0);
+setPlayerAppearances(0);
 setShowAddForm(false);
 } catch (error) {
 console.error("Error adding player:",error);
 alert("Failed to add player. Please try again.");
 }
-},[newPlayer,addPlayer]);
+},[playerName,playerPosition,playerNumber,playerAge,playerHeight,playerWeight,playerPhoto,playerCaptain,playerTries,playerConversions,playerPenalties,playerTackles,playerLineouts,playerAppearances,addPlayer]);
 
 const handleEditPlayer=useCallback((player)=> {
 setEditingPlayer(player.id);
-setNewPlayer({
-name: player.name,
-position: player.position,
-number: player.number ? player.number.toString() : '',
-age: player.age ? player.age.toString() : '',
-height: player.height || '',
-weight: player.weight || '',
-photo: player.photo,
-captain: player.captain,
-stats: {
-tries: player.stats?.tries || 0,
-conversions: player.stats?.conversions || 0,
-penalties: player.stats?.penalties || 0,
-tackles: player.stats?.tackles || 0,
-lineouts: player.stats?.lineouts || 0,
-appearances: player.stats?.appearances || 0
-}
-});
+setPlayerName(player.name);
+setPlayerPosition(player.position);
+setPlayerNumber(player.number ? player.number.toString() : '');
+setPlayerAge(player.age ? player.age.toString() : '');
+setPlayerHeight(player.height || '');
+setPlayerWeight(player.weight || '');
+setPlayerPhoto(player.photo);
+setPlayerCaptain(player.captain);
+setPlayerTries(player.stats?.tries || 0);
+setPlayerConversions(player.stats?.conversions || 0);
+setPlayerPenalties(player.stats?.penalties || 0);
+setPlayerTackles(player.stats?.tackles || 0);
+setPlayerLineouts(player.stats?.lineouts || 0);
+setPlayerAppearances(player.stats?.appearances || 0);
 },[]);
 
 const handleUpdatePlayer=useCallback(async (e)=> {
 e.preventDefault();
 const updateData={
-...newPlayer,
-number: newPlayer.number ? parseInt(newPlayer.number) : null,
-age: newPlayer.age ? parseInt(newPlayer.age) : null,
+name: playerName,
+position: playerPosition,
+number: playerNumber ? parseInt(playerNumber) : null,
+age: playerAge ? parseInt(playerAge) : null,
+height: playerHeight,
+weight: playerWeight,
+photo: playerPhoto,
+captain: playerCaptain,
 stats: {
-tries: parseInt(newPlayer.stats.tries) || 0,
-conversions: parseInt(newPlayer.stats.conversions) || 0,
-penalties: parseInt(newPlayer.stats.penalties) || 0,
-tackles: parseInt(newPlayer.stats.tackles) || 0,
-lineouts: parseInt(newPlayer.stats.lineouts) || 0,
-appearances: parseInt(newPlayer.stats.appearances) || 0
+tries: parseInt(playerTries) || 0,
+conversions: parseInt(playerConversions) || 0,
+penalties: parseInt(playerPenalties) || 0,
+tackles: parseInt(playerTackles) || 0,
+lineouts: parseInt(playerLineouts) || 0,
+appearances: parseInt(playerAppearances) || 0
 }
 };
 
 try {
 await updatePlayer(editingPlayer,updateData);
 setEditingPlayer(null);
-setNewPlayer({
-name: '',
-position: '',
-number: '',
-age: '',
-height: '',
-weight: '',
-photo: '',
-captain: false,
-stats: {
-tries: 0,
-conversions: 0,
-penalties: 0,
-tackles: 0,
-lineouts: 0,
-appearances: 0
-}
-});
+// Reset all individual form fields
+setPlayerName('');
+setPlayerPosition('');
+setPlayerNumber('');
+setPlayerAge('');
+setPlayerHeight('');
+setPlayerWeight('');
+setPlayerPhoto('');
+setPlayerCaptain(false);
+setPlayerTries(0);
+setPlayerConversions(0);
+setPlayerPenalties(0);
+setPlayerTackles(0);
+setPlayerLineouts(0);
+setPlayerAppearances(0);
 } catch (error) {
 console.error("Error updating player:",error);
 alert("Failed to update player. Please try again.");
 }
-},[newPlayer,editingPlayer,updatePlayer]);
+},[editingPlayer,playerName,playerPosition,playerNumber,playerAge,playerHeight,playerWeight,playerPhoto,playerCaptain,playerTries,playerConversions,playerPenalties,playerTackles,playerLineouts,playerAppearances,updatePlayer]);
 
 const handleDeletePlayer=useCallback(async (id,name)=> {
 if (window.confirm(`Are you sure you want to delete ${name}? This action cannot be undone.`)) {
@@ -202,65 +174,85 @@ alert("Failed to delete player. Please try again.");
 }
 },[deletePlayer]);
 
-// 🔧 FIXED: Coach handlers with stable callbacks
+// 🔧 FIXED: Coach handlers with individual state
 const handleAddCoach=useCallback(async (e)=> {
 e.preventDefault();
+const coachData={
+name: coachName,
+role: coachRole,
+qualifications: coachQualifications,
+experience: coachExperience,
+phone: coachPhone,
+email: coachEmail,
+photo: coachPhoto,
+bio: coachBio,
+headCoach: coachHeadCoach
+};
+
 try {
-await addCoach(newCoach);
-setNewCoach({
-name: '',
-role: '',
-qualifications: '',
-experience: '',
-phone: '',
-email: '',
-photo: '',
-bio: '',
-headCoach: false
-});
+await addCoach(coachData);
+// Reset all individual coach fields
+setCoachName('');
+setCoachRole('');
+setCoachQualifications('');
+setCoachExperience('');
+setCoachPhone('');
+setCoachEmail('');
+setCoachPhoto('');
+setCoachBio('');
+setCoachHeadCoach(false);
 setShowAddForm(false);
 } catch (error) {
 console.error("Error adding coach:",error);
 alert("Failed to add coach. Please try again.");
 }
-},[newCoach,addCoach]);
+},[coachName,coachRole,coachQualifications,coachExperience,coachPhone,coachEmail,coachPhoto,coachBio,coachHeadCoach,addCoach]);
 
 const handleEditCoach=useCallback((coach)=> {
 setEditingCoach(coach.id);
-setNewCoach({
-name: coach.name,
-role: coach.role,
-qualifications: coach.qualifications || '',
-experience: coach.experience || '',
-phone: coach.phone || '',
-email: coach.email || '',
-photo: coach.photo,
-bio: coach.bio || '',
-headCoach: coach.headCoach || false
-});
+setCoachName(coach.name);
+setCoachRole(coach.role);
+setCoachQualifications(coach.qualifications || '');
+setCoachExperience(coach.experience || '');
+setCoachPhone(coach.phone || '');
+setCoachEmail(coach.email || '');
+setCoachPhoto(coach.photo);
+setCoachBio(coach.bio || '');
+setCoachHeadCoach(coach.headCoach || false);
 },[]);
 
 const handleUpdateCoach=useCallback(async (e)=> {
 e.preventDefault();
+const updateData={
+name: coachName,
+role: coachRole,
+qualifications: coachQualifications,
+experience: coachExperience,
+phone: coachPhone,
+email: coachEmail,
+photo: coachPhoto,
+bio: coachBio,
+headCoach: coachHeadCoach
+};
+
 try {
-await updateCoach(editingCoach,newCoach);
+await updateCoach(editingCoach,updateData);
 setEditingCoach(null);
-setNewCoach({
-name: '',
-role: '',
-qualifications: '',
-experience: '',
-phone: '',
-email: '',
-photo: '',
-bio: '',
-headCoach: false
-});
+// Reset all individual coach fields
+setCoachName('');
+setCoachRole('');
+setCoachQualifications('');
+setCoachExperience('');
+setCoachPhone('');
+setCoachEmail('');
+setCoachPhoto('');
+setCoachBio('');
+setCoachHeadCoach(false);
 } catch (error) {
 console.error("Error updating coach:",error);
 alert("Failed to update coach. Please try again.");
 }
-},[newCoach,editingCoach,updateCoach]);
+},[editingCoach,coachName,coachRole,coachQualifications,coachExperience,coachPhone,coachEmail,coachPhoto,coachBio,coachHeadCoach,updateCoach]);
 
 const handleDeleteCoach=useCallback(async (id,name)=> {
 if (window.confirm(`Are you sure you want to delete ${name}? This action cannot be undone.`)) {
@@ -277,35 +269,31 @@ const handleCancelEdit=useCallback(()=> {
 setEditingPlayer(null);
 setEditingCoach(null);
 setShowAddForm(false);
-setNewPlayer({
-name: '',
-position: '',
-number: '',
-age: '',
-height: '',
-weight: '',
-photo: '',
-captain: false,
-stats: {
-tries: 0,
-conversions: 0,
-penalties: 0,
-tackles: 0,
-lineouts: 0,
-appearances: 0
-}
-});
-setNewCoach({
-name: '',
-role: '',
-qualifications: '',
-experience: '',
-phone: '',
-email: '',
-photo: '',
-bio: '',
-headCoach: false
-});
+// Reset all individual player fields
+setPlayerName('');
+setPlayerPosition('');
+setPlayerNumber('');
+setPlayerAge('');
+setPlayerHeight('');
+setPlayerWeight('');
+setPlayerPhoto('');
+setPlayerCaptain(false);
+setPlayerTries(0);
+setPlayerConversions(0);
+setPlayerPenalties(0);
+setPlayerTackles(0);
+setPlayerLineouts(0);
+setPlayerAppearances(0);
+// Reset all individual coach fields
+setCoachName('');
+setCoachRole('');
+setCoachQualifications('');
+setCoachExperience('');
+setCoachPhone('');
+setCoachEmail('');
+setCoachPhoto('');
+setCoachBio('');
+setCoachHeadCoach(false);
 },[]);
 
 // 🔧 FIXED: Memoized sorted arrays to prevent re-sorting on every render
@@ -329,15 +317,15 @@ return a.name.localeCompare(b.name);
 // Check if user is admin
 const isAdmin=localStorage.getItem('rugbyAdminAuth')==='true';
 
-// 🔧 FIXED: Memoized input components to prevent recreation
+// 🔧 FIXED: Memoized input components with direct individual state setters
 const PlayerFormInputs=useMemo(()=> (
 <>
 <div>
 <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
 <input
 type="text"
-value={newPlayer.name}
-onChange={(e)=> handlePlayerInputChange('name',e.target.value)}
+value={playerName}
+onChange={(e)=> setPlayerName(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 required
 />
@@ -345,8 +333,8 @@ required
 <div>
 <label className="block text-sm font-medium text-gray-700 mb-1">Position *</label>
 <select
-value={newPlayer.position}
-onChange={(e)=> handlePlayerInputChange('position',e.target.value)}
+value={playerPosition}
+onChange={(e)=> setPlayerPosition(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 required
 >
@@ -360,8 +348,8 @@ required
 <label className="block text-sm font-medium text-gray-700 mb-1">Jersey Number (Optional)</label>
 <input
 type="number"
-value={newPlayer.number}
-onChange={(e)=> handlePlayerInputChange('number',e.target.value)}
+value={playerNumber}
+onChange={(e)=> setPlayerNumber(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 min="1"
 max="99"
@@ -372,8 +360,8 @@ placeholder="Leave empty if no number"
 <label className="block text-sm font-medium text-gray-700 mb-1">Age (Optional)</label>
 <input
 type="number"
-value={newPlayer.age}
-onChange={(e)=> handlePlayerInputChange('age',e.target.value)}
+value={playerAge}
+onChange={(e)=> setPlayerAge(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 min="13"
 max="18"
@@ -384,8 +372,8 @@ placeholder="Leave empty if not specified"
 <label className="block text-sm font-medium text-gray-700 mb-1">Height (Optional)</label>
 <input
 type="text"
-value={newPlayer.height}
-onChange={(e)=> handlePlayerInputChange('height',e.target.value)}
+value={playerHeight}
+onChange={(e)=> setPlayerHeight(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 placeholder="e.g.,5'10&quot;"
 />
@@ -394,8 +382,8 @@ placeholder="e.g.,5'10&quot;"
 <label className="block text-sm font-medium text-gray-700 mb-1">Weight (Optional)</label>
 <input
 type="text"
-value={newPlayer.weight}
-onChange={(e)=> handlePlayerInputChange('weight',e.target.value)}
+value={playerWeight}
+onChange={(e)=> setPlayerWeight(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 placeholder="e.g.,70kg"
 />
@@ -404,8 +392,8 @@ placeholder="e.g.,70kg"
 <label className="block text-sm font-medium text-gray-700 mb-1">Photo URL</label>
 <input
 type="url"
-value={newPlayer.photo}
-onChange={(e)=> handlePlayerInputChange('photo',e.target.value)}
+value={playerPhoto}
+onChange={(e)=> setPlayerPhoto(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 placeholder="https://example.com/photo.jpg"
 />
@@ -414,14 +402,14 @@ placeholder="https://example.com/photo.jpg"
 <input
 type="checkbox"
 id="captain"
-checked={newPlayer.captain}
-onChange={(e)=> handlePlayerInputChange('captain',e.target.checked)}
+checked={playerCaptain}
+onChange={(e)=> setPlayerCaptain(e.target.checked)}
 className="mr-2"
 />
 <label htmlFor="captain" className="text-sm font-medium text-gray-700">Team Captain</label>
 </div>
 </>
-),[newPlayer,handlePlayerInputChange,positions]);
+),[playerName,playerPosition,playerNumber,playerAge,playerHeight,playerWeight,playerPhoto,playerCaptain,positions]);
 
 const PlayerStatsInputs=useMemo(()=> (
 <div className="md:col-span-2 mt-4">
@@ -432,8 +420,8 @@ const PlayerStatsInputs=useMemo(()=> (
 <label className="block text-sm font-medium text-gray-700 mb-1">Tries</label>
 <input
 type="number"
-value={newPlayer.stats.tries}
-onChange={(e)=> handleStatsChange('tries',e.target.value)}
+value={playerTries}
+onChange={(e)=> setPlayerTries(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 min="0"
 />
@@ -442,8 +430,8 @@ min="0"
 <label className="block text-sm font-medium text-gray-700 mb-1">Conversions</label>
 <input
 type="number"
-value={newPlayer.stats.conversions}
-onChange={(e)=> handleStatsChange('conversions',e.target.value)}
+value={playerConversions}
+onChange={(e)=> setPlayerConversions(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 min="0"
 />
@@ -452,8 +440,8 @@ min="0"
 <label className="block text-sm font-medium text-gray-700 mb-1">Penalties</label>
 <input
 type="number"
-value={newPlayer.stats.penalties}
-onChange={(e)=> handleStatsChange('penalties',e.target.value)}
+value={playerPenalties}
+onChange={(e)=> setPlayerPenalties(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 min="0"
 />
@@ -462,8 +450,8 @@ min="0"
 <label className="block text-sm font-medium text-gray-700 mb-1">Tackles</label>
 <input
 type="number"
-value={newPlayer.stats.tackles}
-onChange={(e)=> handleStatsChange('tackles',e.target.value)}
+value={playerTackles}
+onChange={(e)=> setPlayerTackles(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 min="0"
 />
@@ -472,8 +460,8 @@ min="0"
 <label className="block text-sm font-medium text-gray-700 mb-1">Lineouts Won</label>
 <input
 type="number"
-value={newPlayer.stats.lineouts}
-onChange={(e)=> handleStatsChange('lineouts',e.target.value)}
+value={playerLineouts}
+onChange={(e)=> setPlayerLineouts(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 min="0"
 />
@@ -482,8 +470,8 @@ min="0"
 <label className="block text-sm font-medium text-gray-700 mb-1">Appearances</label>
 <input
 type="number"
-value={newPlayer.stats.appearances}
-onChange={(e)=> handleStatsChange('appearances',e.target.value)}
+value={playerAppearances}
+onChange={(e)=> setPlayerAppearances(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 min="0"
 />
@@ -494,7 +482,7 @@ Enter the player's statistics for the current season.
 </p>
 </div>
 </div>
-),[newPlayer.stats,handleStatsChange]);
+),[playerTries,playerConversions,playerPenalties,playerTackles,playerLineouts,playerAppearances]);
 
 const CoachFormInputs=useMemo(()=> (
 <>
@@ -502,8 +490,8 @@ const CoachFormInputs=useMemo(()=> (
 <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
 <input
 type="text"
-value={newCoach.name}
-onChange={(e)=> handleCoachInputChange('name',e.target.value)}
+value={coachName}
+onChange={(e)=> setCoachName(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 required
 />
@@ -511,8 +499,8 @@ required
 <div>
 <label className="block text-sm font-medium text-gray-700 mb-1">Role *</label>
 <select
-value={newCoach.role}
-onChange={(e)=> handleCoachInputChange('role',e.target.value)}
+value={coachRole}
+onChange={(e)=> setCoachRole(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 required
 >
@@ -526,8 +514,8 @@ required
 <label className="block text-sm font-medium text-gray-700 mb-1">Qualifications</label>
 <input
 type="text"
-value={newCoach.qualifications}
-onChange={(e)=> handleCoachInputChange('qualifications',e.target.value)}
+value={coachQualifications}
+onChange={(e)=> setCoachQualifications(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 placeholder="e.g.,Level 2 Coaching,First Aid Certified"
 />
@@ -536,8 +524,8 @@ placeholder="e.g.,Level 2 Coaching,First Aid Certified"
 <label className="block text-sm font-medium text-gray-700 mb-1">Experience</label>
 <input
 type="text"
-value={newCoach.experience}
-onChange={(e)=> handleCoachInputChange('experience',e.target.value)}
+value={coachExperience}
+onChange={(e)=> setCoachExperience(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 placeholder="e.g.,5 years coaching,Former player"
 />
@@ -546,8 +534,8 @@ placeholder="e.g.,5 years coaching,Former player"
 <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
 <input
 type="tel"
-value={newCoach.phone}
-onChange={(e)=> handleCoachInputChange('phone',e.target.value)}
+value={coachPhone}
+onChange={(e)=> setCoachPhone(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 placeholder="Optional contact number"
 />
@@ -556,8 +544,8 @@ placeholder="Optional contact number"
 <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
 <input
 type="email"
-value={newCoach.email}
-onChange={(e)=> handleCoachInputChange('email',e.target.value)}
+value={coachEmail}
+onChange={(e)=> setCoachEmail(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 placeholder="Optional email address"
 />
@@ -566,8 +554,8 @@ placeholder="Optional email address"
 <label className="block text-sm font-medium text-gray-700 mb-1">Photo URL</label>
 <input
 type="url"
-value={newCoach.photo}
-onChange={(e)=> handleCoachInputChange('photo',e.target.value)}
+value={coachPhoto}
+onChange={(e)=> setCoachPhoto(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 placeholder="https://example.com/photo.jpg"
 />
@@ -576,8 +564,8 @@ placeholder="https://example.com/photo.jpg"
 <input
 type="checkbox"
 id="headCoach"
-checked={newCoach.headCoach}
-onChange={(e)=> handleCoachInputChange('headCoach',e.target.checked)}
+checked={coachHeadCoach}
+onChange={(e)=> setCoachHeadCoach(e.target.checked)}
 className="mr-2"
 />
 <label htmlFor="headCoach" className="text-sm font-medium text-gray-700">Head Coach</label>
@@ -585,15 +573,15 @@ className="mr-2"
 <div className="md:col-span-2">
 <label className="block text-sm font-medium text-gray-700 mb-1">Biography</label>
 <textarea
-value={newCoach.bio}
-onChange={(e)=> handleCoachInputChange('bio',e.target.value)}
+value={coachBio}
+onChange={(e)=> setCoachBio(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 rows="4"
 placeholder="Brief biography,coaching philosophy,background,etc."
 />
 </div>
 </>
-),[newCoach,handleCoachInputChange,coachingRoles]);
+),[coachName,coachRole,coachQualifications,coachExperience,coachPhone,coachEmail,coachPhoto,coachBio,coachHeadCoach,coachingRoles]);
 
 const TeamContent=()=> {
 const loading=playersLoading || coachesLoading;
@@ -761,11 +749,7 @@ className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transit
 src={player.photo || `https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=face`}
 alt={player.name}
 className="w-full h-48 md:h-64 object-cover"
-style={{
-'@media (max-width: 768px)': {
-height: '256px'
-}
-}}
+style={{'@media (max-width: 768px)': {height: '256px'}}}
 />
 {player.number && (
 <div className="absolute top-2 left-2">

@@ -1,4 +1,4 @@
-import React,{useState,useEffect} from 'react';
+import React,{useState,useEffect,useCallback,useMemo} from 'react';
 import {motion} from 'framer-motion';
 import {format} from 'date-fns';
 import {useLocation} from 'react-router-dom';
@@ -11,106 +11,110 @@ const {FiTrophy,FiTarget,FiCalendar,FiMapPin,FiPlus,FiEdit2,FiTrash2,FiSave,FiX,
 
 const Results=()=> {
 const {data: results,loading,error,addItem,updateItem,deleteItem}=useSupabaseData('results');
-const location = useLocation();
+const location=useLocation();
+
 const [showAddForm,setShowAddForm]=useState(false);
 const [editingResult,setEditingResult]=useState(null);
-const [newResult,setNewResult]=useState({
-opponent: '',
-date: '',
-venue: '',
-homeAway: 'Home',
-sullivanScore: '',
-opponentScore: '',
-matchType: '',
-notes: ''
-});
+
+// 🔧 FIXED: Individual state hooks to prevent object re-rendering
+const [opponent,setOpponent]=useState('');
+const [date,setDate]=useState('');
+const [venue,setVenue]=useState('');
+const [homeAway,setHomeAway]=useState('Home');
+const [sullivanScore,setSullivanScore]=useState('');
+const [opponentScore,setOpponentScore]=useState('');
+const [matchType,setMatchType]=useState('');
+const [notes,setNotes]=useState('');
 
 // Handle scrolling to specific match when URL has hash
-useEffect(() => {
+useEffect(()=> {
 if (location.hash && results.length > 0) {
 // Small delay to ensure DOM is rendered
-setTimeout(() => {
-const element = document.getElementById(location.hash.substring(1));
+setTimeout(()=> {
+const element=document.getElementById(location.hash.substring(1));
 if (element) {
-element.scrollIntoView({ 
-behavior: 'smooth', 
-block: 'start',
-inline: 'nearest'
-});
+element.scrollIntoView({behavior: 'smooth',block: 'start',inline: 'nearest'});
 }
-}, 100);
+},100);
 }
-}, [location.hash, results]);
+},[location.hash,results]);
 
-const handleAddResult=async (e)=> {
+// 🔧 FIXED: Stable form handlers
+const handleAddResult=useCallback(async (e)=> {
 e.preventDefault();
 const resultData={
-...newResult,
-sullivanScore: parseInt(newResult.sullivanScore),
-opponentScore: parseInt(newResult.opponentScore)
+opponent,
+date,
+venue,
+homeAway,
+sullivanScore: parseInt(sullivanScore),
+opponentScore: parseInt(opponentScore),
+matchType,
+notes
 };
 
 try {
 await addItem(resultData);
-setNewResult({
-opponent: '',
-date: '',
-venue: '',
-homeAway: 'Home',
-sullivanScore: '',
-opponentScore: '',
-matchType: '',
-notes: ''
-});
+// Reset form
+setOpponent('');
+setDate('');
+setVenue('');
+setHomeAway('Home');
+setSullivanScore('');
+setOpponentScore('');
+setMatchType('');
+setNotes('');
 setShowAddForm(false);
 } catch (error) {
 console.error("Error adding result:",error);
 alert("Failed to add result. Please try again.");
 }
-};
+},[opponent,date,venue,homeAway,sullivanScore,opponentScore,matchType,notes,addItem]);
 
-const handleEditResult=(result)=> {
+const handleEditResult=useCallback((result)=> {
 setEditingResult(result.id);
-setNewResult({
-opponent: result.opponent,
-date: result.date,
-venue: result.venue,
-homeAway: result.homeAway,
-sullivanScore: result.sullivanScore.toString(),
-opponentScore: result.opponentScore.toString(),
-matchType: result.matchType || '',
-notes: result.notes || ''
-});
-};
+setOpponent(result.opponent);
+setDate(result.date);
+setVenue(result.venue);
+setHomeAway(result.homeAway);
+setSullivanScore(result.sullivanScore.toString());
+setOpponentScore(result.opponentScore.toString());
+setMatchType(result.matchType || '');
+setNotes(result.notes || '');
+},[]);
 
-const handleUpdateResult=async (e)=> {
+const handleUpdateResult=useCallback(async (e)=> {
 e.preventDefault();
 const updateData={
-...newResult,
-sullivanScore: parseInt(newResult.sullivanScore),
-opponentScore: parseInt(newResult.opponentScore)
+opponent,
+date,
+venue,
+homeAway,
+sullivanScore: parseInt(sullivanScore),
+opponentScore: parseInt(opponentScore),
+matchType,
+notes
 };
 
 try {
 await updateItem(editingResult,updateData);
 setEditingResult(null);
-setNewResult({
-opponent: '',
-date: '',
-venue: '',
-homeAway: 'Home',
-sullivanScore: '',
-opponentScore: '',
-matchType: '',
-notes: ''
-});
+// Reset form
+setOpponent('');
+setDate('');
+setVenue('');
+setHomeAway('Home');
+setSullivanScore('');
+setOpponentScore('');
+setMatchType('');
+setNotes('');
 } catch (error) {
 console.error("Error updating result:",error);
 alert("Failed to update result. Please try again.");
 }
-};
+},[editingResult,opponent,date,venue,homeAway,sullivanScore,opponentScore,matchType,notes,updateItem]);
 
-const handleDeleteResult=async (id,opponent)=> {
+const handleDeleteResult=useCallback(async (id,opponent)=> {
 if (window.confirm(`Are you sure you want to delete the result against ${opponent}? This action cannot be undone.`)) {
 try {
 await deleteItem(id);
@@ -119,22 +123,21 @@ console.error("Error deleting result:",error);
 alert("Failed to delete result. Please try again.");
 }
 }
-};
+},[deleteItem]);
 
-const handleCancelEdit=()=> {
+const handleCancelEdit=useCallback(()=> {
 setEditingResult(null);
 setShowAddForm(false);
-setNewResult({
-opponent: '',
-date: '',
-venue: '',
-homeAway: 'Home',
-sullivanScore: '',
-opponentScore: '',
-matchType: '',
-notes: ''
-});
-};
+// Reset form
+setOpponent('');
+setDate('');
+setVenue('');
+setHomeAway('Home');
+setSullivanScore('');
+setOpponentScore('');
+setMatchType('');
+setNotes('');
+},[]);
 
 const getResultStatus=(sullivanScore,opponentScore)=> {
 if (sullivanScore > opponentScore) return 'win';
@@ -161,11 +164,11 @@ default: return '';
 };
 
 // Calculate season stats
-const wins=results.filter(r=> getResultStatus(r.sullivanScore,r.opponentScore)==='win').length;
-const losses=results.filter(r=> getResultStatus(r.sullivanScore,r.opponentScore)==='loss').length;
-const draws=results.filter(r=> getResultStatus(r.sullivanScore,r.opponentScore)==='draw').length;
-const totalPointsFor=results.reduce((sum,r)=> sum + r.sullivanScore,0);
-const totalPointsAgainst=results.reduce((sum,r)=> sum + r.opponentScore,0);
+const wins=useMemo(()=> results.filter(r=> getResultStatus(r.sullivanScore,r.opponentScore)==='win').length,[results]);
+const losses=useMemo(()=> results.filter(r=> getResultStatus(r.sullivanScore,r.opponentScore)==='loss').length,[results]);
+const draws=useMemo(()=> results.filter(r=> getResultStatus(r.sullivanScore,r.opponentScore)==='draw').length,[results]);
+const totalPointsFor=useMemo(()=> results.reduce((sum,r)=> sum + r.sullivanScore,0),[results]);
+const totalPointsAgainst=useMemo(()=> results.reduce((sum,r)=> sum + r.opponentScore,0),[results]);
 
 // Check if user is admin
 const isAdmin=localStorage.getItem('rugbyAdminAuth')==='true';
@@ -259,8 +262,8 @@ className="bg-white rounded-lg shadow-md p-6 mb-8"
 <label className="block text-sm font-medium text-gray-700 mb-1">Opponent</label>
 <input
 type="text"
-value={newResult.opponent}
-onChange={(e)=> setNewResult({...newResult,opponent: e.target.value})}
+value={opponent}
+onChange={(e)=> setOpponent(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 required
 />
@@ -269,8 +272,8 @@ required
 <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
 <input
 type="date"
-value={newResult.date}
-onChange={(e)=> setNewResult({...newResult,date: e.target.value})}
+value={date}
+onChange={(e)=> setDate(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 required
 />
@@ -279,8 +282,8 @@ required
 <label className="block text-sm font-medium text-gray-700 mb-1">Sullivan Upper Score</label>
 <input
 type="number"
-value={newResult.sullivanScore}
-onChange={(e)=> setNewResult({...newResult,sullivanScore: e.target.value})}
+value={sullivanScore}
+onChange={(e)=> setSullivanScore(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 required
 min="0"
@@ -290,8 +293,8 @@ min="0"
 <label className="block text-sm font-medium text-gray-700 mb-1">Opponent Score</label>
 <input
 type="number"
-value={newResult.opponentScore}
-onChange={(e)=> setNewResult({...newResult,opponentScore: e.target.value})}
+value={opponentScore}
+onChange={(e)=> setOpponentScore(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 required
 min="0"
@@ -300,8 +303,8 @@ min="0"
 <div>
 <label className="block text-sm font-medium text-gray-700 mb-1">Home/Away</label>
 <select
-value={newResult.homeAway}
-onChange={(e)=> setNewResult({...newResult,homeAway: e.target.value})}
+value={homeAway}
+onChange={(e)=> setHomeAway(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 >
 <option value="Home">Home</option>
@@ -312,8 +315,8 @@ className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none
 <label className="block text-sm font-medium text-gray-700 mb-1">Venue</label>
 <input
 type="text"
-value={newResult.venue}
-onChange={(e)=> setNewResult({...newResult,venue: e.target.value})}
+value={venue}
+onChange={(e)=> setVenue(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 required
 />
@@ -322,8 +325,8 @@ required
 <label className="block text-sm font-medium text-gray-700 mb-1">Match Type</label>
 <input
 type="text"
-value={newResult.matchType}
-onChange={(e)=> setNewResult({...newResult,matchType: e.target.value})}
+value={matchType}
+onChange={(e)=> setMatchType(e.target.value)}
 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
 placeholder="e.g.,Friendly,Medallion Shield Round 1,Pre-season,etc."
 />
@@ -342,8 +345,8 @@ Use the rich text editor below to create a detailed match report with proper for
 </p>
 </div>
 <RichTextEditor
-value={newResult.notes}
-onChange={(content)=> setNewResult({...newResult,notes: content})}
+value={notes}
+onChange={(content)=> setNotes(content)}
 placeholder="Write your match report here. Include key moments,player performances,tactical observations,and match highlights..."
 />
 </div>
@@ -374,7 +377,7 @@ className="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transit
 {results.map((result,index)=> {
 const status=getResultStatus(result.sullivanScore,result.opponentScore);
 // Create unique anchor ID for each match result
-const anchorId = `match-${result.date}-${result.opponent.toLowerCase().replace(/\s+/g, '-')}`;
+const anchorId=`match-${result.date}-${result.opponent.toLowerCase().replace(/\s+/g,'-')}`;
 
 return (
 <motion.div
@@ -413,6 +416,7 @@ Sullivan Upper vs {result.opponent}
 </div>
 )}
 </div>
+
 <div className="mt-4 md:mt-0 flex items-center space-x-4">
 <div className="text-right">
 <div className="text-3xl font-bold text-gray-800">
@@ -448,8 +452,8 @@ title="Delete result"
 <SafeIcon icon={FiFileText} className="w-5 h-5" />
 <span>Match Report</span>
 </h4>
-<div 
-className="newspaper-content text-gray-700 leading-relaxed" 
+<div
+className="newspaper-content text-gray-700 leading-relaxed"
 dangerouslySetInnerHTML={{__html: result.notes}}
 style={{fontSize: '15px',lineHeight: '1.7'}}
 />
