@@ -7,12 +7,13 @@ import SafeIcon from '../common/SafeIcon';
 import RichTextEditor from '../components/RichTextEditor';
 import {useSupabaseData} from '../hooks/useSupabaseData';
 
-const {FiTrophy,FiTarget,FiCalendar,FiMapPin,FiPlus,FiEdit2,FiTrash2,FiSave,FiX,FiFileText,FiMinus}=FiIcons;
+const {FiTrophy,FiTarget,FiCalendar,FiMapPin,FiPlus,FiEdit2,FiTrash2,FiSave,FiX,FiFileText,FiMinus,FiAward,FiStar}=FiIcons;
 
 const Results=()=> {
 const {data: results,loading,error,addItem,updateItem,deleteItem}=useSupabaseData('results');
+// 🆕 NEW: Fetch players data for Player of the Match photos
+const {data: players}=useSupabaseData('players');
 const location=useLocation();
-
 const [showAddForm,setShowAddForm]=useState(false);
 const [editingResult,setEditingResult]=useState(null);
 
@@ -25,6 +26,25 @@ const [sullivanScore,setSullivanScore]=useState('');
 const [opponentScore,setOpponentScore]=useState('');
 const [matchType,setMatchType]=useState('');
 const [notes,setNotes]=useState('');
+// 🆕 NEW: Player of the Match state
+const [playerOfMatch,setPlayerOfMatch]=useState('');
+
+// 🆕 NEW: Function to find player photo by name (case-insensitive)
+const findPlayerPhoto=useCallback((playerName)=> {
+if (!playerName || !players || players.length===0) return null;
+
+const normalizedSearchName=playerName.trim().toLowerCase();
+const matchedPlayer=players.find(player=> 
+player.name.toLowerCase()===normalizedSearchName
+);
+
+return matchedPlayer ? {
+photo: matchedPlayer.photo,
+name: matchedPlayer.name,
+position: matchedPlayer.position,
+number: matchedPlayer.number
+} : null;
+},[players]);
 
 // Handle scrolling to specific match when URL has hash
 useEffect(()=> {
@@ -42,6 +62,7 @@ element.scrollIntoView({behavior: 'smooth',block: 'start',inline: 'nearest'});
 // 🔧 FIXED: Stable form handlers
 const handleAddResult=useCallback(async (e)=> {
 e.preventDefault();
+
 const resultData={
 opponent,
 date,
@@ -50,11 +71,13 @@ homeAway,
 sullivanScore: parseInt(sullivanScore),
 opponentScore: parseInt(opponentScore),
 matchType,
-notes
+notes,
+playerOfMatch: playerOfMatch.trim() // 🆕 NEW: Include player of match
 };
 
 try {
 await addItem(resultData);
+
 // Reset form
 setOpponent('');
 setDate('');
@@ -64,12 +87,13 @@ setSullivanScore('');
 setOpponentScore('');
 setMatchType('');
 setNotes('');
+setPlayerOfMatch(''); // 🆕 NEW: Reset player of match
 setShowAddForm(false);
 } catch (error) {
 console.error("Error adding result:",error);
 alert("Failed to add result. Please try again.");
 }
-},[opponent,date,venue,homeAway,sullivanScore,opponentScore,matchType,notes,addItem]);
+},[opponent,date,venue,homeAway,sullivanScore,opponentScore,matchType,notes,playerOfMatch,addItem]);
 
 const handleEditResult=useCallback((result)=> {
 setEditingResult(result.id);
@@ -81,10 +105,12 @@ setSullivanScore(result.sullivanScore.toString());
 setOpponentScore(result.opponentScore.toString());
 setMatchType(result.matchType || '');
 setNotes(result.notes || '');
+setPlayerOfMatch(result.playerOfMatch || ''); // 🆕 NEW: Load player of match
 },[]);
 
 const handleUpdateResult=useCallback(async (e)=> {
 e.preventDefault();
+
 const updateData={
 opponent,
 date,
@@ -93,12 +119,14 @@ homeAway,
 sullivanScore: parseInt(sullivanScore),
 opponentScore: parseInt(opponentScore),
 matchType,
-notes
+notes,
+playerOfMatch: playerOfMatch.trim() // 🆕 NEW: Include player of match
 };
 
 try {
 await updateItem(editingResult,updateData);
 setEditingResult(null);
+
 // Reset form
 setOpponent('');
 setDate('');
@@ -108,11 +136,12 @@ setSullivanScore('');
 setOpponentScore('');
 setMatchType('');
 setNotes('');
+setPlayerOfMatch(''); // 🆕 NEW: Reset player of match
 } catch (error) {
 console.error("Error updating result:",error);
 alert("Failed to update result. Please try again.");
 }
-},[editingResult,opponent,date,venue,homeAway,sullivanScore,opponentScore,matchType,notes,updateItem]);
+},[editingResult,opponent,date,venue,homeAway,sullivanScore,opponentScore,matchType,notes,playerOfMatch,updateItem]);
 
 const handleDeleteResult=useCallback(async (id,opponent)=> {
 if (window.confirm(`Are you sure you want to delete the result against ${opponent}? This action cannot be undone.`)) {
@@ -128,6 +157,7 @@ alert("Failed to delete result. Please try again.");
 const handleCancelEdit=useCallback(()=> {
 setEditingResult(null);
 setShowAddForm(false);
+
 // Reset form
 setOpponent('');
 setDate('');
@@ -137,6 +167,7 @@ setSullivanScore('');
 setOpponentScore('');
 setMatchType('');
 setNotes('');
+setPlayerOfMatch(''); // 🆕 NEW: Reset player of match
 },[]);
 
 const getResultStatus=(sullivanScore,opponentScore)=> {
@@ -331,6 +362,23 @@ className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none
 placeholder="e.g.,Friendly,Medallion Shield Round 1,Pre-season,etc."
 />
 </div>
+{/* 🆕 NEW: Player of the Match input */}
+<div className="md:col-span-2">
+<label className="block text-sm font-medium text-gray-700 mb-1 flex items-center space-x-2">
+<SafeIcon icon={FiAward} className="w-4 h-4" />
+<span>Coach's Player of the Match (Optional)</span>
+</label>
+<input
+type="text"
+value={playerOfMatch}
+onChange={(e)=> setPlayerOfMatch(e.target.value)}
+className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+placeholder="Enter the name of the standout player (optional)"
+/>
+<p className="text-xs text-gray-500 mt-1">
+Recognition for the player who made the biggest impact in the match. If the player is in the squad database,their photo will be displayed automatically.
+</p>
+</div>
 </div>
 
 {/* Rich Text Editor for Match Report */}
@@ -376,8 +424,12 @@ className="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transit
 <div className="space-y-6">
 {results.map((result,index)=> {
 const status=getResultStatus(result.sullivanScore,result.opponentScore);
+
 // Create unique anchor ID for each match result
 const anchorId=`match-${result.date}-${result.opponent.toLowerCase().replace(/\s+/g,'-')}`;
+
+// 🆕 NEW: Get player photo for Player of the Match
+const playerDetails=result.playerOfMatch ? findPlayerPhoto(result.playerOfMatch) : null;
 
 return (
 <motion.div
@@ -445,6 +497,62 @@ title="Delete result"
 </div>
 </div>
 
+{/* 🆕 ENHANCED: Player of the Match Recognition Section with Photo */}
+{result.playerOfMatch && result.playerOfMatch.trim() && (
+<motion.div
+initial={{opacity: 0,y: 10}}
+animate={{opacity: 1,y: 0}}
+className="mb-4 p-4 bg-gradient-to-r from-green-50 to-green-100 border-l-4 border-green-600 rounded-lg"
+>
+<div className="flex items-center space-x-4">
+{/* 🆕 NEW: Player Photo (if available) */}
+{playerDetails && playerDetails.photo && (
+<div className="flex-shrink-0">
+<img
+src={playerDetails.photo}
+alt={playerDetails.name}
+className="w-16 h-16 rounded-full object-cover border-3 border-green-600 shadow-md"
+onError={(e)=> {
+// Hide image if it fails to load
+e.target.style.display='none';
+}}
+/>
+</div>
+)}
+
+{/* Trophy Icon */}
+<div className="flex items-center justify-center w-10 h-10 bg-green-600 rounded-full flex-shrink-0">
+<SafeIcon icon={FiStar} className="w-6 h-6 text-white" />
+</div>
+
+{/* Award Text and Player Info */}
+<div className="flex-1">
+<h4 className="text-lg font-bold text-green-800 flex items-center space-x-2">
+<SafeIcon icon={FiStar} className="w-5 h-5" />
+<span>Coach's Player of the Match</span>
+</h4>
+<div className="flex flex-col">
+<p className="text-green-700 font-semibold text-lg">
+{result.playerOfMatch}
+</p>
+{/* 🆕 NEW: Show additional player details if found in squad */}
+{playerDetails && (
+<div className="flex items-center space-x-3 mt-1 text-sm text-green-600">
+<span>{playerDetails.position}</span>
+{playerDetails.number && (
+<>
+<span>•</span>
+<span>#{playerDetails.number}</span>
+</>
+)}
+</div>
+)}
+</div>
+</div>
+</div>
+</motion.div>
+)}
+
 {/* Match Report with Rich Text Display */}
 {result.notes && (
 <div className="border-t pt-4">
@@ -474,7 +582,9 @@ style={{fontSize: '15px',lineHeight: '1.7'}}
 
 {/* Additional inline styles to ensure headlines work */}
 <style jsx>{`
-.newspaper-content h1,.newspaper-content h2,.newspaper-content h3 {
+.newspaper-content h1,
+.newspaper-content h2,
+.newspaper-content h3 {
 line-height: 0.85 !important;
 margin-bottom: 0.2em !important;
 font-weight: 600 !important;

@@ -11,19 +11,18 @@ const getTableName = (baseTable) => {
     'media': 'media_rugby12345',
     'stats': 'stats_rugby12345'
   }
-  
   return tableMap[baseTable] || baseTable
 }
 
 // Transform data from Supabase to frontend format
 const transformSupabaseToFrontend = (item, baseTable) => {
-  let transformedItem = {...item};
-
+  let transformedItem = { ...item };
+  
   if (baseTable === 'fixtures' && item.home_away) {
     transformedItem.homeAway = item.home_away;
     delete transformedItem.home_away;
   }
-
+  
   if (baseTable === 'results') {
     if (item.home_away) {
       transformedItem.homeAway = item.home_away;
@@ -40,6 +39,11 @@ const transformSupabaseToFrontend = (item, baseTable) => {
     if (item.match_type) {
       transformedItem.matchType = item.match_type;
       delete transformedItem.match_type;
+    }
+    // 🆕 NEW: Transform player_of_match field
+    if (item.player_of_match !== undefined) {
+      transformedItem.playerOfMatch = item.player_of_match;
+      delete transformedItem.player_of_match;
     }
   }
 
@@ -68,10 +72,10 @@ export const useSupabaseData = (baseTable) => {
       setLoading(true)
       console.log(`🔄 Fetching data from ${table}...`)
       
-      const {data: result, error} = await supabase
+      const { data: result, error } = await supabase
         .from(table)
         .select('*')
-        .order('created_at', {ascending: false})
+        .order('created_at', { ascending: false })
 
       if (error) throw error
 
@@ -154,19 +158,22 @@ export const useSupabaseData = (baseTable) => {
   const addItem = async (item) => {
     try {
       console.log(`➕ Adding item to ${table}:`, item)
-
+      
       // Transform certain fields based on table
-      let transformedItem = {...item}
-
-      // For fixtures, transform homeAway to home_away
+      let transformedItem = { ...item }
+      
+      // For fixtures, transform homeAway to home_away and handle cancellation fields
       if (baseTable === 'fixtures') {
         transformedItem = {
           ...transformedItem,
           home_away: item.homeAway,
         }
         delete transformedItem.homeAway
+        
+        // 🆕 NEW: Handle cancellation fields - no transformation needed, they match database
+        // cancelled and cancellation_reason are used as-is
       }
-
+      
       // For results, transform fields
       if (baseTable === 'results') {
         transformedItem = {
@@ -180,6 +187,12 @@ export const useSupabaseData = (baseTable) => {
         delete transformedItem.sullivanScore
         delete transformedItem.opponentScore
         delete transformedItem.matchType
+        
+        // 🆕 NEW: Transform player_of_match field
+        if (item.playerOfMatch !== undefined) {
+          transformedItem.player_of_match = item.playerOfMatch;
+          delete transformedItem.playerOfMatch;
+        }
       }
 
       // 🔧 FIX: For media, transform videoType to videotype
@@ -191,7 +204,7 @@ export const useSupabaseData = (baseTable) => {
         // NEW: thumbnail field doesn't need transformation - keep as is
       }
 
-      const {data: result, error} = await supabase
+      const { data: result, error } = await supabase
         .from(table)
         .insert([transformedItem])
         .select()
@@ -211,16 +224,21 @@ export const useSupabaseData = (baseTable) => {
   const updateItem = async (id, updates) => {
     try {
       console.log(`📝 Updating item ${id} in ${table}`)
-
+      
       // Transform certain fields based on table
-      let transformedUpdates = {...updates}
-
-      // For fixtures, transform homeAway to home_away
-      if (baseTable === 'fixtures' && updates.homeAway !== undefined) {
-        transformedUpdates.home_away = updates.homeAway
-        delete transformedUpdates.homeAway
+      let transformedUpdates = { ...updates }
+      
+      // For fixtures, transform homeAway to home_away and handle cancellation fields
+      if (baseTable === 'fixtures') {
+        if (updates.homeAway !== undefined) {
+          transformedUpdates.home_away = updates.homeAway
+          delete transformedUpdates.homeAway
+        }
+        
+        // 🆕 NEW: Handle cancellation fields - no transformation needed, they match database
+        // cancelled and cancellation_reason are used as-is
       }
-
+      
       // For results, transform fields
       if (baseTable === 'results') {
         if (updates.homeAway !== undefined) {
@@ -239,6 +257,12 @@ export const useSupabaseData = (baseTable) => {
           transformedUpdates.match_type = updates.matchType
           delete transformedUpdates.matchType
         }
+        
+        // 🆕 NEW: Transform player_of_match field
+        if (updates.playerOfMatch !== undefined) {
+          transformedUpdates.player_of_match = updates.playerOfMatch;
+          delete transformedUpdates.playerOfMatch;
+        }
       }
 
       // 🔧 FIX: For media, transform videoType to videotype
@@ -250,7 +274,7 @@ export const useSupabaseData = (baseTable) => {
         // NEW: thumbnail field doesn't need transformation - keep as is
       }
 
-      const {data: result, error} = await supabase
+      const { data: result, error } = await supabase
         .from(table)
         .update(transformedUpdates)
         .eq('id', id)
@@ -271,8 +295,8 @@ export const useSupabaseData = (baseTable) => {
   const deleteItem = async (id) => {
     try {
       console.log(`🗑️ Deleting item ${id} from ${table}`)
-
-      const {error} = await supabase
+      
+      const { error } = await supabase
         .from(table)
         .delete()
         .eq('id', id)
